@@ -2084,10 +2084,9 @@ class LevelEditor {
   X = Cracked Stone (shatter via Ground Pound or Shell)
   - = One-way wooden bridge
   C = Crumbling platform
-  ~ = Water pool
+  ~ = Water pool (with real-time reflection)
   ! = Glowing lava hazard
   | = Background decorative pillar
-  ^ = Spikes
 
   Entities:
   P = Player spawn
@@ -2100,7 +2099,6 @@ class LevelEditor {
   t = Shell Beetle
   w = Solar Wisp
   v = Lunar Wisp
-  M = Horizontal Moving Platform (4-tile travel)
   H = Heart Pickup
   @ = Boss Spawn (Prism Golem)
 */
@@ -2146,28 +2144,88 @@ const STAGE_2_MAP = [
 ];
 
 const STAGE_3_MAP = [
-  '.........................................................................................................',
-  '.........................................................................................................',
-  '.........................................................................................................',
-  '.........................................................................................................',
-  '......................................................................................|.............|....',
-  '......................................................................................|.............|....',
-  '......................................................................................|.............|....',
-  '.....................................c.c.c............................................|...c.....c...|....',
-  '....................................B?B?B?B...........................................|..SSS...LLL..|....',
-  '...................c.c.......................................c.c......................|.............|....',
-  '..................SSSSS......D......LLLLLLL......D..........CCCCC.........H...........|......D......|....',
-  '..........c.c.........................................................................|.............|....',
-  '.....P...LLLLL....e....t.....w.......XXXXX.......v....U.......t.......K...............|......@......|..G.',
-  '#########.....#############.....###############.....#####...#####..###########........###################',
-  'ddddddddd!!!!!ddddddddddddd!!!!!ddddddddddddddd!!!!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!ddddddddddddddddddd',
-  'ddddddddd!!!!!ddddddddddddd!!!!!ddddddddddddddd!!!!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!ddddddddddddddddddd',
-  'ddddddddd!!!!!ddddddddddddd!!!!!ddddddddddddddd!!!!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!ddddddddddddddddddd',
+  '....................................................................................................................',
+  '....................................................................................................................',
+  '....................................................................................................................',
+  '..........................................c.c.c.c...................................................................',
+  '.........................................---------....................................c.c.c.........................',
+  '......................c.c.c..........................................................B?B?B?B........................',
+  '.....................B?B?B......................................c.c.................................................',
+  '...............................................................LLLLL................................................',
+  '....................................c.c.c.........................................c.c.c..........c.c.c..............',
+  '.............c.c...................SSSSSSS..............D........................SSSSSSS........LLLLLLL.............',
+  '............-----...............................................w.......v...........................................',
+  '.........................U......................c.c.......................................U.........................',
+  '.....P.....c.....t......###..c.c..........t....XXXXX....K....|.....e.....|....t....e.....###.....c...c.........G....',
+  '##########....######....###..----..#############...########..#############..###########..###...#########....########',
+  'dddddddddd~~~~dddddd~~~~ddd~~~~~~~~ddddddddddddd~~~dddddddd~~ddddddddddddd~~ddddddddddd~~ddd~~~ddddddddd~~~~dddddddd',
+  'dddddddddd~~~~dddddd~~~~ddd~~~~~~~~ddddddddddddd~~~dddddddd~~ddddddddddddd~~ddddddddddd~~ddd~~~ddddddddd~~~~dddddddd',
+  'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+];
+
+const STAGE_4_MAP = [
+  '........................................................................................................................',
+  '........................................................................................................................',
+  '........................................................................................................................',
+  '....................................................................c.c.c...............................................',
+  '...................................................................-------..............................................',
+  '........................................c.c.c........................................................c.c.c..............',
+  '.......................................B?B?B........................................................B?B?B...............',
+  '........................................................c.c.............................................................',
+  '...................c.c.................................SSSSS................c.c..........c.c............................',
+  '..................SSSSS......D...........c.c.......................D.......CCCCC........LLLLL......D....................',
+  '........................................CCCCC...........................................................................',
+  '..........c.c......................................U......................................................U.............',
+  '.....P...LLLLL.....e.....t.......w......c...c.....###.....K....v.....t.....XXXXX....H.....e.....w........###........G...',
+  '#########.....#############.....####....#####.....###..########....#####...#####..#####..######....LLLL..###..##########',
+  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!!!ddddd!!!!!ddd!!dddddddd!!!!ddddd!!!ddddd!!ddddd!!dddddd!!!!....!!ddd!!dddddddddd',
+  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!!!ddddd!!!!!ddd!!dddddddd!!!!ddddd!!!ddddd!!ddddd!!dddddd!!!!!!!!!!ddd!!dddddddddd',
+  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!!!ddddd!!!!!ddd!!dddddddd!!!!ddddd!!!ddddd!!ddddd!!dddddd!!!!!!!!!!ddd!!dddddddddd',
+];
+
+const STAGE_5_MAP = [
+  '........................................................................................................................',
+  '........................................................................................................................',
+  '........................................#........#......................................................................',
+  '........................................#..c..c..#.................................c.c.c................................',
+  '........................................#..LLLL..#................................-------...............................',
+  '......................c.c.c.............#........#...............................................#.......#..............',
+  '.....................-------............#..SSSS..#.............c.c...............................#..c.c..#..............',
+  '........................................#...D....#............LLLLL.........D....................#..SSS..#..............',
+  '.............c.c........................#........#....................................c.c........#.......#..............',
+  '............LLLLL.........D.............#..LLLL..#.....w................v............CCCCC.......#..LLL..#....D.........',
+  '........................................#........#...............................................#...D...#..............',
+  '.......................U................#..SSSS..#..........U....................................#.......#..............',
+  '.....P....c.....e.....###.....t.........#........#...K.....###....c...c.....t.....H.....e.....U..#.......#..........G...',
+  '#########...LLLL...######..######..SSS..#........#..#####..###..SSSS..LLLL..##########..####..##.#..SSS..#..LLL..#######',
+  'ddddddddd!!!....!!!dddddd!!dddddd!!...!!d!!!!!!!!d!!ddddd!!ddd!!....!!....!!dddddddddd!!dddd!!dd!d!!...!!d!!...!!ddddddd',
+  'ddddddddd!!!!!!!!!!dddddd!!dddddd!!!!!!!d!!!!!!!!d!!ddddd!!ddd!!!!!!!!!!!!!!dddddddddd!!dddd!!dd!d!!!!!!!d!!!!!!!ddddddd',
+  'ddddddddd!!!!!!!!!!dddddd!!dddddd!!!!!!!d!!!!!!!!d!!ddddd!!ddd!!!!!!!!!!!!!!dddddddddd!!dddd!!dd!d!!!!!!!d!!!!!!!ddddddd',
+];
+
+const STAGE_6_MAP = [
+  '...............................................................................................................',
+  '...............................................................................................................',
+  '...............................................................................................................',
+  '...............................................................................................................',
+  '............................................................................................|.............|....',
+  '............................................................................................|.............|....',
+  '............................................................................................|.............|....',
+  '...........................................c.c.c............................................|...c.....c...|....',
+  '..........................................B?B?B?B...........................................|..SSS...LLL..|....',
+  '...................c.c.............................................c.c......................|.............|....',
+  '..................SSSSS......D............LLLLLLL......D..........CCCCC.........H...........|......D......|....',
+  '..........c.c...............................................................................|.............|....',
+  '.....P...LLLLL....e....t.....w.............XXXXX.......v....U.......t.......K...............|......@......|..G.',
+  '#########.....#############.....####..###############.....#####...#####..###########........###################',
+  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!ddddddddddddddd!!!!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!ddddddddddddddddddd',
+  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!ddddddddddddddd!!!!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!ddddddddddddddddddd',
+  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!ddddddddddddddd!!!!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!ddddddddddddddddddd',
 ];
 const STAGE_DEFS = [
   {
     id: 1,
-    name: 'STAGE 1 — 晨光遺跡',
+    name: 'STAGE 1/6 — 晨光遺跡',
     subtitle: 'Sunlit Ruins',
     startPhase: PHASE.SOLAR,
     map: STAGE_1_MAP,
@@ -2176,7 +2234,7 @@ const STAGE_DEFS = [
   },
   {
     id: 2,
-    name: 'STAGE 2 — 稜鏡峽谷',
+    name: 'STAGE 2/6 — 稜鏡峽谷',
     subtitle: 'Prism Chasm',
     startPhase: PHASE.LUNAR,
     map: STAGE_2_MAP,
@@ -2185,11 +2243,38 @@ const STAGE_DEFS = [
   },
   {
     id: 3,
-    name: 'STAGE 3 — 雙相聖殿',
-    subtitle: 'Twin-Phase Sanctum',
+    name: 'STAGE 3/6 — 翡翠水殿',
+    subtitle: 'Emerald Aqueduct',
     startPhase: PHASE.SOLAR,
     map: STAGE_3_MAP,
-    hint: '終極試煉：擊敗聖殿深處的【稜鏡巨像】！踩踏其核心或踢龜殼反擊！',
+    hint: '翡翠水道！踢出甲殼甲蟲一路撞飛敵人與裂石，彈簧直衝高空隱藏寶庫！',
+    hasBoss: false,
+  },
+  {
+    id: 4,
+    name: 'STAGE 4/6 — 熾焰鍛爐',
+    subtitle: 'Solar Foundry',
+    startPhase: PHASE.SOLAR,
+    map: STAGE_4_MAP,
+    hint: '岩漿鍛爐試煉！精準把握崩塌磚節奏與空中衝刺水晶連跳！',
+    hasBoss: false,
+  },
+  {
+    id: 5,
+    name: 'STAGE 5/6 — 星月高塔',
+    subtitle: 'Lunar Spire',
+    startPhase: PHASE.LUNAR,
+    map: STAGE_5_MAP,
+    hint: '雙塔攀升！在垂直井道中交替切換 熾陽/星月 相位並配合蹬牆跳登頂！',
+    hasBoss: false,
+  },
+  {
+    id: 6,
+    name: 'STAGE 6/6 — 雙相聖殿',
+    subtitle: 'Twin-Phase Sanctum',
+    startPhase: PHASE.SOLAR,
+    map: STAGE_6_MAP,
+    hint: '最終決戰：擊敗聖殿深處的【稜鏡巨像】！踩踏頭頂核心或踢龜殼造成雙倍暴擊！',
     hasBoss: true,
   },
 ];
@@ -2263,14 +2348,24 @@ class Level {
       }
     }
 
-    // Add moving platforms in Stage 1 & 2 for extra kinetic variety
+    // Add moving platforms tailored to each stage
     if (this.id === 1) {
       this.entitySpawns.push({ type: 'platform', x: 28 * 16, y: 11 * 16, w: 48, rangeX: 56, rangeY: 0, speed: 1.5 });
     } else if (this.id === 2) {
       this.entitySpawns.push({ type: 'platform', x: 16 * 16, y: 12 * 16, w: 48, rangeX: 48, rangeY: 0, speed: 1.7 });
       this.entitySpawns.push({ type: 'platform', x: 56 * 16, y: 11 * 16, w: 48, rangeX: 0, rangeY: 42, speed: 1.6 });
     } else if (this.id === 3) {
-      this.entitySpawns.push({ type: 'platform', x: 64 * 16, y: 11 * 16, w: 48, rangeX: 44, rangeY: 0, speed: 1.9 });
+      this.entitySpawns.push({ type: 'platform', x: 27 * 16, y: 11 * 16, w: 48, rangeX: 52, rangeY: 0, speed: 1.5 });
+      this.entitySpawns.push({ type: 'platform', x: 74 * 16, y: 10 * 16, w: 48, rangeX: 0, rangeY: 38, speed: 1.7 });
+    } else if (this.id === 4) {
+      this.entitySpawns.push({ type: 'platform', x: 28 * 16, y: 12 * 16, w: 44, rangeX: 54, rangeY: 0, speed: 1.9 });
+      this.entitySpawns.push({ type: 'platform', x: 63 * 16, y: 11 * 16, w: 44, rangeX: 46, rangeY: 0, speed: 2.0 });
+      this.entitySpawns.push({ type: 'platform', x: 96 * 16, y: 11 * 16, w: 44, rangeX: 0, rangeY: 44, speed: 1.8 });
+    } else if (this.id === 5) {
+      this.entitySpawns.push({ type: 'platform', x: 43 * 16, y: 10 * 16, w: 40, rangeX: 0, rangeY: 54, speed: 1.8 });
+      this.entitySpawns.push({ type: 'platform', x: 76 * 16, y: 11 * 16, w: 44, rangeX: 46, rangeY: 0, speed: 1.9 });
+    } else if (this.id === 6) {
+      this.entitySpawns.push({ type: 'platform', x: 70 * 16, y: 11 * 16, w: 48, rangeX: 48, rangeY: 0, speed: 1.9 });
     }
   }
 
@@ -3355,8 +3450,8 @@ class PrismGolemBoss {
     this.h = 32;
     this.vx = 0;
     this.vy = 0;
-    this.hp = 6;
-    this.maxHp = 6;
+    this.hp = 8;
+    this.maxHp = 8;
     this.alive = true;
     this.active = false;
     this.bossPhase = PHASE.SOLAR;
@@ -3365,6 +3460,7 @@ class PrismGolemBoss {
     this.state = 'idle'; // 'idle' | 'leap' | 'orbs'
     this.onGround = false;
     this.homeX = x;
+    this.summonedMinion = false;
   }
 
   get cx() { return this.x + this.w * 0.5; }
@@ -3382,6 +3478,13 @@ class PrismGolemBoss {
     game.particles.burst(this.cx, this.cy, 24, col, { speedMax: 170, glow: true });
     game.particles.spawnRipple(this.cx, this.cy, col, 140);
     game.addScore(500, this.cx, this.y - 6, 'CRITICAL!');
+
+    // Phase 2: drop a Shell Beetle minion so player can kick shells for 2x damage!
+    if (this.hp > 0 && this.hp <= 4 && !this.summonedMinion) {
+      this.summonedMinion = true;
+      game.enemies.push(new BeetleEnemy(this.homeX - 56, this.y - 12));
+      game.particles.spawnText(this.cx, this.y - 20, 'PHASE 2! SHELL DROP!', '#ffd561');
+    }
 
     if (this.hp <= 0) {
       this.alive = false;
@@ -4362,10 +4465,10 @@ class Renderer {
     ctx.font = `700 22px ${UI_FONT}`;
     ctx.fillText('按 [ENTER] 或 [SPACE] 開始冒險', W * 0.5, 348);
 
-    ctx.font = `500 15px ${UI_FONT}`;
+    ctx.font = `500 14px ${UI_FONT}`;
     ctx.fillStyle = '#9db2de';
-    ctx.fillText('快速選關：按 [1] 晨光遺跡   [2] 稜鏡峽谷   [3] 雙相聖殿 (BOSS)', W * 0.5, 396);
-    ctx.fillText('按 [Shift] 可即時預覽標題雙相光影切換！', W * 0.5, 428);
+    ctx.fillText('快速選關：[1] 晨光遺跡  [2] 稜鏡峽谷  [3] 翡翠水殿  [4] 熾焰鍛爐  [5] 星月高塔  [6] 雙相聖殿(BOSS)', W * 0.5, 396);
+    ctx.fillText('按 [Shift] 預覽雙相光影  •  [F2] 即時關卡編輯器  •  [G] WebGL Shader', W * 0.5, 428);
     ctx.textAlign = 'left';
   }
 
@@ -4381,7 +4484,7 @@ class Renderer {
     ctx.fillText('PAUSED 暫停中', W * 0.5, 244);
     ctx.font = `600 17px ${UI_FONT}`;
     ctx.fillStyle = '#b9c8eb';
-    ctx.fillText('[ESC / P] 繼續遊戲    [R] 重玩本關    [1 / 2 / 3] 切換關卡', W * 0.5, 296);
+    ctx.fillText('[ESC / P] 繼續遊戲    [R] 重玩本關    [1–6] 切換關卡    [F2] 關卡編輯', W * 0.5, 296);
     ctx.textAlign = 'left';
   }
 
@@ -4660,10 +4763,13 @@ class Game {
     this.time += dt;
     this.sound.update(dt);
 
-    // Quick stage shortcuts (1/2/3)
+    // Quick stage shortcuts (1-6)
     if (input.stage1) { this.score = 0; this.coins = 0; this.loadStage(0, true); return; }
     if (input.stage2) { this.score = 0; this.coins = 0; this.loadStage(1, true); return; }
     if (input.stage3) { this.score = 0; this.coins = 0; this.loadStage(2, true); return; }
+    if (input.stage4) { this.score = 0; this.coins = 0; this.loadStage(3, true); return; }
+    if (input.stage5) { this.score = 0; this.coins = 0; this.loadStage(4, true); return; }
+    if (input.stage6) { this.score = 0; this.coins = 0; this.loadStage(5, true); return; }
 
     // Title screen interactive loop
     if (this.state === STATE.TITLE) {
@@ -4924,6 +5030,9 @@ function readInput() {
     stage1: anyPressed('Digit1'),
     stage2: anyPressed('Digit2'),
     stage3: anyPressed('Digit3'),
+    stage4: anyPressed('Digit4'),
+    stage5: anyPressed('Digit5'),
+    stage6: anyPressed('Digit6'),
   };
 
   // Optional Gamepad support

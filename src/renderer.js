@@ -877,10 +877,10 @@ export class Renderer {
     ctx.font = `700 22px ${UI_FONT}`;
     ctx.fillText('按 [ENTER] 或 [SPACE] 開始冒險', W * 0.5, 348);
 
-    ctx.font = `500 15px ${UI_FONT}`;
+    ctx.font = `500 14px ${UI_FONT}`;
     ctx.fillStyle = '#9db2de';
-    ctx.fillText('快速選關：按 [1] 晨光遺跡   [2] 稜鏡峽谷   [3] 雙相聖殿 (BOSS)', W * 0.5, 396);
-    ctx.fillText('按 [Shift] 可即時預覽標題雙相光影切換！', W * 0.5, 428);
+    ctx.fillText('快速選關：[1] 晨光遺跡  [2] 稜鏡峽谷  [3] 翡翠水殿  [4] 熾焰鍛爐  [5] 星月高塔  [6] 雙相聖殿(BOSS)', W * 0.5, 396);
+    ctx.fillText('按 [Shift] 預覽雙相光影  •  [F2] 即時關卡編輯器  •  [G] WebGL Shader', W * 0.5, 428);
     ctx.textAlign = 'left';
   }
 
@@ -896,7 +896,7 @@ export class Renderer {
     ctx.fillText('PAUSED 暫停中', W * 0.5, 244);
     ctx.font = `600 17px ${UI_FONT}`;
     ctx.fillStyle = '#b9c8eb';
-    ctx.fillText('[ESC / P] 繼續遊戲    [R] 重玩本關    [1 / 2 / 3] 切換關卡', W * 0.5, 296);
+    ctx.fillText('[ESC / P] 繼續遊戲    [R] 重玩本關    [1–6] 切換關卡    [F2] 關卡編輯', W * 0.5, 296);
     ctx.textAlign = 'left';
   }
 

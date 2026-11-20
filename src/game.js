@@ -223,10 +223,13 @@ export class Game {
     this.time += dt;
     this.sound.update(dt);
 
-    // Quick stage shortcuts (1/2/3)
+    // Quick stage shortcuts (1-6)
     if (input.stage1) { this.score = 0; this.coins = 0; this.loadStage(0, true); return; }
     if (input.stage2) { this.score = 0; this.coins = 0; this.loadStage(1, true); return; }
     if (input.stage3) { this.score = 0; this.coins = 0; this.loadStage(2, true); return; }
+    if (input.stage4) { this.score = 0; this.coins = 0; this.loadStage(3, true); return; }
+    if (input.stage5) { this.score = 0; this.coins = 0; this.loadStage(4, true); return; }
+    if (input.stage6) { this.score = 0; this.coins = 0; this.loadStage(5, true); return; }
 
     // Title screen interactive loop
     if (this.state === STATE.TITLE) {

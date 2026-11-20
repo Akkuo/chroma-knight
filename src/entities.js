@@ -497,8 +497,8 @@ export class PrismGolemBoss {
     this.h = 32;
     this.vx = 0;
     this.vy = 0;
-    this.hp = 6;
-    this.maxHp = 6;
+    this.hp = 8;
+    this.maxHp = 8;
     this.alive = true;
     this.active = false;
     this.bossPhase = PHASE.SOLAR;
@@ -507,6 +507,7 @@ export class PrismGolemBoss {
     this.state = 'idle'; // 'idle' | 'leap' | 'orbs'
     this.onGround = false;
     this.homeX = x;
+    this.summonedMinion = false;
   }
 
   get cx() { return this.x + this.w * 0.5; }
@@ -524,6 +525,13 @@ export class PrismGolemBoss {
     game.particles.burst(this.cx, this.cy, 24, col, { speedMax: 170, glow: true });
     game.particles.spawnRipple(this.cx, this.cy, col, 140);
     game.addScore(500, this.cx, this.y - 6, 'CRITICAL!');
+
+    // Phase 2: drop a Shell Beetle minion so player can kick shells for 2x damage!
+    if (this.hp > 0 && this.hp <= 4 && !this.summonedMinion) {
+      this.summonedMinion = true;
+      game.enemies.push(new BeetleEnemy(this.homeX - 56, this.y - 12));
+      game.particles.spawnText(this.cx, this.y - 20, 'PHASE 2! SHELL DROP!', '#ffd561');
+    }
 
     if (this.hp <= 0) {
       this.alive = false;

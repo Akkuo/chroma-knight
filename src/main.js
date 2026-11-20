@@ -114,6 +114,9 @@ function readInput() {
     stage1: anyPressed('Digit1'),
     stage2: anyPressed('Digit2'),
     stage3: anyPressed('Digit3'),
+    stage4: anyPressed('Digit4'),
+    stage5: anyPressed('Digit5'),
+    stage6: anyPressed('Digit6'),
   };
 
   // Optional Gamepad support
