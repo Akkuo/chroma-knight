@@ -14,8 +14,25 @@
         <div id="editor-ui"></div>
       </div>
 
+      <div id="touch-controls" aria-label="行動端虛擬手把">
+        <div class="touch-dpad">
+          <button class="tbtn" data-key="ArrowLeft" aria-label="左">◀</button>
+          <div class="touch-dpad-mid">
+            <button class="tbtn small" data-key="ArrowUp" aria-label="上">▲</button>
+            <button class="tbtn small" data-key="ArrowDown" aria-label="下/重擊">▼</button>
+          </div>
+          <button class="tbtn" data-key="ArrowRight" aria-label="右">▶</button>
+        </div>
+        <div class="touch-actions">
+          <button class="tbtn phase" data-key="ShiftLeft">相位</button>
+          <button class="tbtn dash" data-key="KeyX">衝刺</button>
+          <button class="tbtn jump" data-key="Space">跳躍</button>
+        </div>
+      </div>
+
       <footer id="controls-bar">
         <span class="badge solar" id="phase-pill">SOLAR 熾陽</span>
+        <button id="touch-toggle-btn" class="mini-btn" type="button">🎮 觸控手把</button>
         <span><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> 移動</span>
         <span><kbd>Space</kbd> / <kbd>Z</kbd> 跳躍・蹬牆跳</span>
         <span><kbd>X</kbd> / <kbd>J</kbd> 衝刺</span>

@@ -93,6 +93,55 @@ displayCanvas.addEventListener('pointerdown', () => {
   sound.unlock();
 });
 
+// --- MOBILE TOUCH VIRTUAL GAMEPAD ---
+const touchRoot = document.getElementById('touch-controls');
+const touchToggleBtn = document.getElementById('touch-toggle-btn');
+const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+if (touchRoot && isTouchDevice) {
+  touchRoot.classList.add('visible');
+}
+if (touchToggleBtn && touchRoot) {
+  touchToggleBtn.addEventListener('click', () => {
+    touchRoot.classList.toggle('visible');
+    renderer.resize();
+  });
+}
+if (touchRoot) {
+  const activePointers = new Map();
+  const pressCode = (code, btn) => {
+    sound.unlock();
+    if (!keys.has(code)) justPressed.add(code);
+    keys.add(code);
+    btn.classList.add('pressed');
+  };
+  const releasePointer = (pid) => {
+    const entry = activePointers.get(pid);
+    if (!entry) return;
+    activePointers.delete(pid);
+    entry.btn.classList.remove('pressed');
+    // Keep code held if another finger holds same key
+    let stillHeld = false;
+    for (const v of activePointers.values()) {
+      if (v.code === entry.code) stillHeld = true;
+    }
+    if (!stillHeld) keys.delete(entry.code);
+  };
+  touchRoot.querySelectorAll('.tbtn[data-key]').forEach((btn) => {
+    const code = btn.dataset.key;
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      btn.setPointerCapture(e.pointerId);
+      activePointers.set(e.pointerId, { code, btn });
+      pressCode(code, btn);
+    });
+    btn.addEventListener('pointerup', (e) => {
+      e.preventDefault();
+      releasePointer(e.pointerId);
+    });
+    btn.addEventListener('pointercancel', (e) => releasePointer(e.pointerId));
+  });
+}
+
 let prevPadButtons = [];
 function readInput() {
   const anyDown = (...codes) => codes.some((c) => keys.has(c));
