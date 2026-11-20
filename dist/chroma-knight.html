@@ -5122,7 +5122,7 @@ class Game {
 
     if (resetPlayer || !this.player) {
       this.player = new Player(this.level.spawn.x, this.level.spawn.y);
-      this.camera.x = Math.max(0, this.player.cx - GAME_WIDTH * 0.35);
+      this.camera.x = Math.max(0, Math.min(this.level.widthPx - GAME_WIDTH, this.player.cx - GAME_WIDTH * 0.5));
       this.camera.y = 0;
     }
     this.coinsList = [];
@@ -5406,23 +5406,24 @@ class Game {
 
   _updateCamera(dt) {
     if (this.player) {
-      const lookAhead = this.player.facing * 36;
+      // Center-locked camera (no directional lookAhead whip to prevent motion sickness)
       const targetX = Math.max(
         0,
-        Math.min(this.level.widthPx - GAME_WIDTH, this.player.cx + lookAhead - GAME_WIDTH * 0.44)
+        Math.min(this.level.widthPx - GAME_WIDTH, this.player.cx - GAME_WIDTH * 0.5)
       );
       const targetY = Math.max(
         0,
-        Math.min(this.level.heightPx - GAME_HEIGHT, this.player.cy - GAME_HEIGHT * 0.56)
+        Math.min(this.level.heightPx - GAME_HEIGHT, this.player.cy - GAME_HEIGHT * 0.55)
       );
-      this.camera.x += (targetX - this.camera.x) * Math.min(1, dt * 7.5);
-      this.camera.y += (targetY - this.camera.y) * Math.min(1, dt * 6);
+      this.camera.x = targetX;
+      this.camera.y += (targetY - this.camera.y) * Math.min(1, dt * 8);
     }
 
     if (this.camera.shake > 0.1) {
-      this.camera.shakeX = (Math.random() - 0.5) * this.camera.shake * 2;
-      this.camera.shakeY = (Math.random() - 0.5) * this.camera.shake * 2;
-      this.camera.shake *= Math.pow(0.001, dt);
+      const s = Math.min(4.5, this.camera.shake);
+      this.camera.shakeX = (Math.random() - 0.5) * s * 1.4;
+      this.camera.shakeY = (Math.random() - 0.5) * s * 1.4;
+      this.camera.shake *= Math.pow(0.0004, dt);
     } else {
       this.camera.shake = 0;
       this.camera.shakeX = 0;
