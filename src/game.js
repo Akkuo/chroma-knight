@@ -2,6 +2,7 @@ import { GAME_WIDTH, GAME_HEIGHT, PHASE, STATE, TILE, TILE_SIZE } from './consta
 import { Level, STAGE_DEFS } from './levels.js';
 import { Player } from './player.js';
 import { ParticleSystem } from './particles.js';
+import { GhostSystem } from './ghost.js';
 import {
   Coin,
   HeartPickup,
@@ -16,11 +17,14 @@ import {
 } from './entities.js';
 
 export class Game {
-  constructor(atlas, sound, onPhaseChange) {
+  constructor(atlas, sound, onPhaseChange, onAberration = null) {
     this.atlas = atlas;
     this.sound = sound;
     this.onPhaseChange = onPhaseChange;
+    this.onAberration = onAberration;
     this.particles = new ParticleSystem();
+    this.ghost = new GhostSystem();
+    this.editor = null;
 
     this.state = STATE.TITLE;
     this.stageIndex = 0;
@@ -60,12 +64,26 @@ export class Game {
     const def = STAGE_DEFS[this.stageIndex];
     this.level = new Level(def);
     this.phase = def.startPhase;
+    this.rebuildRuntimeFromLevel(true);
+
+    if (this.onPhaseChange) this.onPhaseChange(this.phase);
+    if (enterPlaying) {
+      this.state = STATE.PLAYING;
+      this.sound.setBgmMode(this.phase);
+    }
+  }
+
+  rebuildRuntimeFromLevel(resetPlayer = true) {
     this.stageTime = 0;
     this.combo = 0;
     this.comboTimer = 0;
     this.hitstop = 0;
 
-    this.player = new Player(this.level.spawn.x, this.level.spawn.y);
+    if (resetPlayer || !this.player) {
+      this.player = new Player(this.level.spawn.x, this.level.spawn.y);
+      this.camera.x = Math.max(0, this.player.cx - GAME_WIDTH * 0.35);
+      this.camera.y = 0;
+    }
     this.coinsList = [];
     this.hearts = [];
     this.dashCrystals = [];
@@ -94,16 +112,8 @@ export class Game {
     this.particles.clear();
     this.particles.initGrass(this.level);
     this.particles.initAmbient(this.level.widthPx, this.level.heightPx);
-
-    this.camera.x = Math.max(0, this.player.cx - GAME_WIDTH * 0.35);
-    this.camera.y = 0;
     this.camera.shake = 0;
-
-    if (this.onPhaseChange) this.onPhaseChange(this.phase);
-    if (enterPlaying) {
-      this.state = STATE.PLAYING;
-      this.sound.setBgmMode(this.phase);
-    }
+    this.ghost.startStage(this.level.id);
   }
 
   respawnAtCheckpoint() {
@@ -117,6 +127,9 @@ export class Game {
 
   addShake(amount) {
     this.camera.shake = Math.max(this.camera.shake, amount);
+    if (amount >= 6 && this.onAberration) {
+      this.onAberration(Math.min(1.2, amount * 0.09));
+    }
   }
 
   addScore(pts, x, y, label) {
@@ -130,6 +143,7 @@ export class Game {
     this.phase = this.phase === PHASE.SOLAR ? PHASE.LUNAR : PHASE.SOLAR;
     const isLunar = this.phase === PHASE.LUNAR;
     this.sound.playPhaseShift(isLunar);
+    if (this.onAberration) this.onAberration(1.0);
     if (!this.boss || !this.boss.active || !this.boss.alive) {
       this.sound.setBgmMode(this.phase);
     }
@@ -260,6 +274,13 @@ export class Game {
       return;
     }
 
+    // --- LIVE EDITOR MODE ---
+    if (this.editor && this.editor.active) {
+      this.editor.update(dt, input);
+      if (input.phasePressed) this.togglePhase();
+      return;
+    }
+
     // --- PLAYING STATE ---
     if (input.pausePressed) {
       this.state = STATE.PAUSED;
@@ -281,6 +302,7 @@ export class Game {
     }
 
     this.stageTime += dt;
+    this.ghost.recordFrame(dt, this.player, this.phase);
     if (this.comboTimer > 0) {
       this.comboTimer -= dt;
       if (this.comboTimer <= 0) this.combo = 0;
@@ -313,9 +335,10 @@ export class Game {
       Math.abs(this.player.cx - (gx + 8)) < 16 &&
       Math.abs(this.player.cy - (gy - 4)) < 24
     ) {
+      const isNewRecord = this.ghost.finishStage(this.stageTime);
       this.sound.playVictory();
       this.sound.setBgmMode('off');
-      this.addScore(1000, gx + 8, gy - 16, 'CLEAR +1000!');
+      this.addScore(1000, gx + 8, gy - 16, isNewRecord ? 'NEW RECORD!' : 'CLEAR +1000!');
       this.particles.burst(gx + 8, gy - 4, 34, '#ffe066', { speedMax: 180, glow: true });
       if (this.stageIndex >= STAGE_DEFS.length - 1) {
         this.state = STATE.VICTORY;

@@ -1,17 +1,24 @@
-import { PHASE } from './constants.js';
+import { PHASE, STATE } from './constants.js';
 import { SoundEngine } from './audio.js';
 import { createSpriteAtlas } from './sprites.js';
 import { Renderer } from './renderer.js';
+import { WebGLPostProcessor } from './webgl-post.js';
+import { LevelEditor } from './editor.js';
 import { Game } from './game.js';
 
-const canvas = document.getElementById('game');
+const displayCanvas = document.getElementById('game');
 const canvasWrap = document.getElementById('canvas-wrap');
 const crtOverlay = document.getElementById('crt-overlay');
 const phasePill = document.getElementById('phase-pill');
+const editorRoot = document.getElementById('editor-ui');
 
 const sound = new SoundEngine();
 const atlas = createSpriteAtlas();
-const renderer = new Renderer(canvas, atlas);
+
+// Initialize WebGL Post-Processing Pipeline (with graceful Canvas2D fallback)
+const post = new WebGLPostProcessor(displayCanvas);
+const renderCanvas = post.supported ? document.createElement('canvas') : displayCanvas;
+const renderer = new Renderer(renderCanvas, atlas, displayCanvas);
 window.addEventListener('resize', () => renderer.resize());
 
 function syncPhaseUI(phase) {
@@ -22,14 +29,18 @@ function syncPhaseUI(phase) {
   phasePill.textContent = isLunar ? 'LUNAR 星月' : 'SOLAR 熾陽';
 }
 
-const game = new Game(atlas, sound, syncPhaseUI);
+const game = new Game(atlas, sound, syncPhaseUI, (strength) => {
+  post.triggerAberration(strength);
+});
+const editor = new LevelEditor(displayCanvas, game, editorRoot);
+game.editor = editor;
 
 // --- INPUT MANAGER (Keyboard + Gamepad) ---
 const keys = new Set();
 const justPressed = new Set();
 
 const PREVENT_KEYS = new Set([
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'F3',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'F2', 'F3',
 ]);
 
 window.addEventListener('keydown', (e) => {
@@ -44,6 +55,27 @@ window.addEventListener('keydown', (e) => {
     sound.toggleMute();
   } else if (e.code === 'KeyV') {
     crtOverlay.classList.toggle('crt-on');
+  } else if (e.code === 'KeyG') {
+    post.enabled = !post.enabled;
+    game.particles.spawnText(
+      game.player.cx,
+      game.player.y - 8,
+      post.enabled ? 'SHADER ON' : 'SHADER OFF',
+      '#7eeeff'
+    );
+  } else if (e.code === 'KeyT') {
+    game.ghost.enabled = !game.ghost.enabled;
+    game.particles.spawnText(
+      game.player.cx,
+      game.player.y - 8,
+      game.ghost.enabled ? 'GHOST ON' : 'GHOST OFF',
+      '#4af7c8'
+    );
+  } else if (e.code === 'F2') {
+    if (game.state === STATE.TITLE) {
+      game.loadStage(0, true);
+    }
+    editor.toggle();
   } else if (e.code === 'F3') {
     game.showDebug = !game.showDebug;
   }
@@ -57,7 +89,7 @@ window.addEventListener('blur', () => {
   keys.clear();
 });
 
-canvas.addEventListener('pointerdown', () => {
+displayCanvas.addEventListener('pointerdown', () => {
   sound.unlock();
 });
 
@@ -133,6 +165,7 @@ function loop(now) {
   while (accumulator >= STEP) {
     const input = readInput();
     game.update(STEP, input);
+    post.update(STEP, game.phase === PHASE.LUNAR);
     accumulator -= STEP;
     stepped = true;
   }
@@ -141,6 +174,9 @@ function loop(now) {
   }
 
   renderer.render(game);
+  if (post.supported) {
+    post.render(renderCanvas, game.time);
+  }
   requestAnimationFrame(loop);
 }
 

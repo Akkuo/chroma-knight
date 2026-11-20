@@ -139,6 +139,141 @@ canvas#game {
   border: 1px solid rgba(92, 224, 255, 0.55);
 }
 
+/* --- LIVE LEVEL EDITOR OVERLAY --- */
+#editor-ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px;
+  z-index: 10;
+}
+
+#editor-ui.open {
+  display: flex;
+}
+
+.ed-header,
+.ed-palette {
+  pointer-events: auto;
+  background: rgba(10, 13, 25, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 10px;
+  backdrop-filter: blur(8px);
+}
+
+.ed-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ed-title {
+  font-weight: 800;
+  font-size: 12px;
+  color: #4af7c8;
+  letter-spacing: 0.05em;
+}
+
+.ed-hint {
+  font-size: 11px;
+  color: #a7b6d8;
+}
+
+.ed-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ed-btn {
+  cursor: pointer;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 700;
+  color: #edf2ff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+  transition: background 0.15s ease;
+}
+
+.ed-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ed-btn.primary {
+  background: rgba(74, 247, 200, 0.22);
+  border-color: #4af7c8;
+  color: #9effe6;
+}
+
+.ed-btn.danger {
+  background: rgba(255, 89, 120, 0.2);
+  border-color: rgba(255, 89, 120, 0.55);
+  color: #ff9fb0;
+}
+
+.ed-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+
+.ed-swatch {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-family: inherit;
+  color: #dce4fa;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.ed-swatch.active {
+  background: rgba(255, 210, 90, 0.24);
+  border-color: #ffd561;
+  color: #fff6cc;
+}
+
+.ed-swatch .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.ed-toast {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(14, 20, 38, 0.92);
+  border: 1px solid #4af7c8;
+  color: #b4ffea;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.ed-toast.show {
+  opacity: 1;
+}
+
 </style>
   </head>
   <body>
@@ -146,6 +281,7 @@ canvas#game {
       <div id="canvas-wrap">
         <canvas id="game" width="960" height="540"></canvas>
         <div id="crt-overlay"></div>
+        <div id="editor-ui"></div>
       </div>
 
       <footer id="controls-bar">
@@ -155,9 +291,11 @@ canvas#game {
         <span><kbd>X</kbd> / <kbd>J</kbd> 衝刺</span>
         <span><kbd>Shift</kbd> / <kbd>K</kbd> / <kbd>E</kbd> 相位切換</span>
         <span><kbd>↓</kbd> 空中重擊</span>
+        <span><kbd>F2</kbd> 關卡編輯</span>
+        <span><kbd>G</kbd> Shader</span>
+        <span><kbd>T</kbd> 殘影</span>
         <span><kbd>R</kbd> 重來</span>
         <span><kbd>M</kbd> 靜音</span>
-        <span><kbd>V</kbd> CRT</span>
         <span><kbd>F3</kbd> 除錯</span>
       </footer>
     </main>
@@ -1347,6 +1485,588 @@ class ParticleSystem {
       if (a.x < 0) a.x = levelWidthPx;
       if (a.x > levelWidthPx) a.x = 0;
     }
+  }
+}
+
+// === src/ghost.js ===
+// Speedrun Ghost Replay System (30Hz recording + localStorage best run persistence)
+
+const STORAGE_PREFIX = 'chroma_knight_ghost_v1_stage_';
+class GhostSystem {
+  constructor() {
+    this.enabled = true;
+    this.recording = [];
+    this.bestRun = null; // { time: number, frames: Array }
+    this.recordAccum = 0;
+    this.stageId = 1;
+    this.lastSavedNewRecord = false;
+  }
+
+  startStage(stageId) {
+    this.stageId = stageId;
+    this.recording = [];
+    this.recordAccum = 0;
+    this.lastSavedNewRecord = false;
+    this.bestRun = this._load(stageId);
+  }
+
+  recordFrame(dt, player, phase) {
+    this.recordAccum += dt;
+    if (this.recordAccum < 1 / 30) return;
+    this.recordAccum -= 1 / 30;
+    // Cap recording length at 5 minutes (9000 frames)
+    if (this.recording.length >= 9000) return;
+    this.recording.push([
+      Math.round(player.x * 10) / 10,
+      Math.round(player.y * 10) / 10,
+      player.facing >= 0 ? 1 : -1,
+      phase === 'lunar' ? 1 : 0,
+      player.onGround ? (Math.abs(player.vx) > 15 ? 1 : 0) : 2,
+    ]);
+  }
+
+  finishStage(clearTime) {
+    if (this.recording.length < 10) return false;
+    if (!this.bestRun || clearTime < this.bestRun.time) {
+      const payload = {
+        time: Math.round(clearTime * 100) / 100,
+        frames: this.recording,
+      };
+      this.bestRun = payload;
+      this.lastSavedNewRecord = true;
+      this._save(this.stageId, payload);
+      return true;
+    }
+    return false;
+  }
+
+  getPlaybackFrame(stageTime) {
+    if (!this.enabled || !this.bestRun || !this.bestRun.frames.length) return null;
+    const idx = Math.min(this.bestRun.frames.length - 1, Math.floor(stageTime * 30));
+    const f = this.bestRun.frames[idx];
+    return {
+      x: f[0],
+      y: f[1],
+      facing: f[2],
+      phase: f[3] === 1 ? 'lunar' : 'solar',
+      pose: f[4],
+      bestTime: this.bestRun.time,
+      finished: idx >= this.bestRun.frames.length - 1,
+    };
+  }
+
+  _load(stageId) {
+    try {
+      const raw = localStorage.getItem(STORAGE_PREFIX + stageId);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.time === 'number' && Array.isArray(parsed.frames)) {
+        return parsed;
+      }
+    } catch {
+      // Ignore storage errors
+    }
+    return null;
+  }
+
+  _save(stageId, payload) {
+    try {
+      localStorage.setItem(STORAGE_PREFIX + stageId, JSON.stringify(payload));
+    } catch {
+      // Ignore quota errors
+    }
+  }
+}
+
+// === src/webgl-post.js ===
+// WebGL Post-Processing Pipeline: True Bloom, Chromatic Aberration, and Water Shimmer
+
+const VERT_SRC = `
+attribute vec2 aPos;
+varying vec2 vUv;
+void main() {
+  vUv = vec2(aPos.x * 0.5 + 0.5, 0.5 - aPos.y * 0.5);
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}
+`;
+
+const FRAG_SRC = `
+precision mediump float;
+varying vec2 vUv;
+uniform sampler2D uTex;
+uniform vec2 uTexel;
+uniform float uTime;
+uniform float uAberration;
+uniform float uBloomStrength;
+uniform float uPhaseMix; // 0.0 = solar, 1.0 = lunar
+uniform float uEnabled;
+
+vec3 sampleBright(vec2 uv) {
+  vec3 c = texture2D(uTex, clamp(uv, 0.001, 0.999)).rgb;
+  float lum = dot(c, vec3(0.299, 0.587, 0.114));
+  float mask = smoothstep(0.68, 0.95, lum);
+  return c * mask;
+}
+
+void main() {
+  if (uEnabled < 0.5) {
+    gl_FragColor = texture2D(uTex, vUv);
+    return;
+  }
+
+  // 1. Radial Chromatic Aberration (spikes on Phase Shift / Ground Pound / Boss Hit)
+  vec2 centered = vUv - vec2(0.5);
+  float dist = length(centered);
+  vec2 dir = dist > 0.0001 ? centered / dist : vec2(0.0);
+  float ca = uAberration * (0.004 + dist * 0.018);
+
+  float r = texture2D(uTex, clamp(vUv + dir * ca, 0.001, 0.999)).r;
+  float g = texture2D(uTex, vUv).g;
+  float b = texture2D(uTex, clamp(vUv - dir * ca, 0.001, 0.999)).b;
+  vec3 baseColor = vec3(r, g, b);
+
+  // 2. Multi-tap Star/Gaussian Bloom
+  vec2 px = uTexel * 2.4;
+  vec3 bloom = sampleBright(vUv) * 0.24;
+  bloom += sampleBright(vUv + vec2( px.x,  0.0)) * 0.12;
+  bloom += sampleBright(vUv + vec2(-px.x,  0.0)) * 0.12;
+  bloom += sampleBright(vUv + vec2( 0.0,  px.y)) * 0.12;
+  bloom += sampleBright(vUv + vec2( 0.0, -px.y)) * 0.12;
+  bloom += sampleBright(vUv + vec2( px.x,  px.y) * 1.4) * 0.07;
+  bloom += sampleBright(vUv + vec2(-px.x,  px.y) * 1.4) * 0.07;
+  bloom += sampleBright(vUv + vec2( px.x, -px.y) * 1.4) * 0.07;
+  bloom += sampleBright(vUv + vec2(-px.x, -px.y) * 1.4) * 0.07;
+
+  // Phase-tinted bloom warmth/coolness
+  vec3 bloomTint = mix(vec3(1.08, 0.96, 0.85), vec3(0.84, 0.98, 1.12), uPhaseMix);
+  vec3 color = baseColor + bloom * bloomTint * uBloomStrength;
+
+  // Subtle chromatic shock flash rim when aberration is high
+  color += bloomTint * (uAberration * dist * 0.16);
+
+  gl_FragColor = vec4(color, 1.0);
+}
+`;
+class WebGLPostProcessor {
+  constructor(displayCanvas) {
+    this.displayCanvas = displayCanvas;
+    this.enabled = true;
+    this.supported = false;
+    this.aberration = 0;
+    this.phaseMix = 0;
+
+    const gl = displayCanvas.getContext('webgl', {
+      alpha: false,
+      antialias: false,
+      depth: false,
+      stencil: false,
+      preserveDrawingBuffer: false,
+    });
+    if (!gl) return;
+    this.gl = gl;
+
+    const vs = this._compile(gl.VERTEX_SHADER, VERT_SRC);
+    const fs = this._compile(gl.FRAGMENT_SHADER, FRAG_SRC);
+    if (!vs || !fs) return;
+
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+
+    this.program = prog;
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+      gl.STATIC_DRAW
+    );
+    const loc = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+    this.tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    this.uTex = gl.getUniformLocation(prog, 'uTex');
+    this.uTexel = gl.getUniformLocation(prog, 'uTexel');
+    this.uTime = gl.getUniformLocation(prog, 'uTime');
+    this.uAberration = gl.getUniformLocation(prog, 'uAberration');
+    this.uBloomStrength = gl.getUniformLocation(prog, 'uBloomStrength');
+    this.uPhaseMix = gl.getUniformLocation(prog, 'uPhaseMix');
+    this.uEnabled = gl.getUniformLocation(prog, 'uEnabled');
+
+    this.supported = true;
+  }
+
+  _compile(type, src) {
+    const gl = this.gl;
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.warn('Shader compile error:', gl.getShaderInfoLog(s));
+      return null;
+    }
+    return s;
+  }
+
+  triggerAberration(strength = 1.0) {
+    this.aberration = Math.max(this.aberration, strength);
+  }
+
+  update(dt, isLunar) {
+    const target = isLunar ? 1 : 0;
+    this.phaseMix += (target - this.phaseMix) * Math.min(1, dt * 8);
+    if (this.aberration > 0.002) {
+      this.aberration *= Math.pow(0.004, dt);
+    } else {
+      this.aberration = 0;
+    }
+  }
+
+  render(sourceCanvas, time) {
+    if (!this.supported) return false;
+    const gl = this.gl;
+    if (
+      this.displayCanvas.width !== sourceCanvas.width ||
+      this.displayCanvas.height !== sourceCanvas.height
+    ) {
+      this.displayCanvas.width = sourceCanvas.width;
+      this.displayCanvas.height = sourceCanvas.height;
+    }
+    gl.viewport(0, 0, this.displayCanvas.width, this.displayCanvas.height);
+    gl.useProgram(this.program);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
+
+    gl.uniform1i(this.uTex, 0);
+    gl.uniform2f(this.uTexel, 1 / sourceCanvas.width, 1 / sourceCanvas.height);
+    gl.uniform1f(this.uTime, time);
+    gl.uniform1f(this.uAberration, this.aberration);
+    gl.uniform1f(this.uBloomStrength, 0.34);
+    gl.uniform1f(this.uPhaseMix, this.phaseMix);
+    gl.uniform1f(this.uEnabled, this.enabled ? 1 : 0);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    return true;
+  }
+}
+
+// === src/editor.js ===
+const EDITOR_PALETTE = [
+  { id: 'tile:1', label: '草地', kind: 'tile', tile: TILE.GROUND, color: '#44c767' },
+  { id: 'tile:2', label: '岩土', kind: 'tile', tile: TILE.DIRT, color: '#7a4b38' },
+  { id: 'tile:3', label: '磚塊', kind: 'tile', tile: TILE.BRICK, color: '#dc7a5c' },
+  { id: 'tile:4', label: '問號磚', kind: 'tile', tile: TILE.QUESTION, color: '#ffbe2e' },
+  { id: 'tile:6', label: '熾陽磚', kind: 'tile', tile: TILE.SOLAR_BLOCK, color: '#ff9838' },
+  { id: 'tile:7', label: '星月磚', kind: 'tile', tile: TILE.LUNAR_BLOCK, color: '#4ae3ff' },
+  { id: 'tile:9', label: '裂石', kind: 'tile', tile: TILE.CRACKED, color: '#9aa0ba' },
+  { id: 'tile:10', label: '單向橋', kind: 'tile', tile: TILE.ONE_WAY, color: '#c47b43' },
+  { id: 'tile:11', label: '崩塌磚', kind: 'tile', tile: TILE.CRUMBLE, color: '#d6bca5' },
+  { id: 'tile:8', label: '尖刺', kind: 'tile', tile: TILE.SPIKE, color: '#ff5978' },
+  { id: 'tile:12', label: '水面', kind: 'tile', tile: TILE.WATER, color: '#38c7e0' },
+  { id: 'tile:14', label: '岩漿', kind: 'tile', tile: TILE.LAVA, color: '#ff5238' },
+  { id: 'tile:13', label: '石柱', kind: 'tile', tile: TILE.PILLAR, color: '#6b7299' },
+  { id: 'tile:0', label: '橡皮擦', kind: 'tile', tile: TILE.EMPTY, color: '#33384d' },
+  { id: 'ent:coin', label: '金幣', kind: 'entity', ent: 'coin', color: '#ffe169' },
+  { id: 'ent:dash_crystal', label: '衝刺晶', kind: 'entity', ent: 'dash_crystal', color: '#4af7c8' },
+  { id: 'ent:spring', label: '彈簧', kind: 'entity', ent: 'spring', color: '#ff6b7a' },
+  { id: 'ent:checkpoint', label: '存檔燈', kind: 'entity', ent: 'checkpoint', color: '#ffd966' },
+  { id: 'ent:slime', label: '史萊姆', kind: 'entity', ent: 'slime', color: '#58e076' },
+  { id: 'ent:beetle', label: '甲殼蟲', kind: 'entity', ent: 'beetle', color: '#e0485e' },
+  { id: 'ent:wisp_solar', label: '熾陽火', kind: 'entity', ent: 'wisp_solar', color: '#ffaa38' },
+  { id: 'ent:wisp_lunar', label: '星月火', kind: 'entity', ent: 'wisp_lunar', color: '#5ce6ff' },
+  { id: 'ent:heart', label: '愛心', kind: 'entity', ent: 'heart', color: '#ff4265' },
+  { id: 'ent:spawn', label: '起點P', kind: 'spawn', color: '#ffffff' },
+  { id: 'ent:goal', label: '終點門', kind: 'goal', color: '#b78cff' },
+];
+class LevelEditor {
+  constructor(canvas, game, uiRoot) {
+    this.canvas = canvas;
+    this.game = game;
+    this.uiRoot = uiRoot;
+    this.active = false;
+    this.selected = EDITOR_PALETTE[0];
+    this.hoverTx = -1;
+    this.hoverTy = -1;
+    this.mouseDownBtn = -1;
+    this.toastText = '';
+    this.toastTimer = 0;
+
+    this._buildUI();
+    this._bindEvents();
+  }
+
+  _buildUI() {
+    if (!this.uiRoot) return;
+    this.uiRoot.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.className = 'ed-header';
+    header.innerHTML = `
+      <span class="ed-title">LIVE LEVEL EDITOR (F2)</span>
+      <span class="ed-hint">左鍵繪製 / 右鍵擦除 / WASD 移動鏡頭</span>
+      <div class="ed-actions">
+        <button data-act="play" class="ed-btn primary">▶ 即時試玩 (F2)</button>
+        <button data-act="export" class="ed-btn">📤 匯出 JSON</button>
+        <button data-act="import" class="ed-btn">📥 匯入 JSON</button>
+        <button data-act="reset" class="ed-btn danger">↺ 重置本關</button>
+      </div>
+    `;
+    this.uiRoot.appendChild(header);
+
+    const paletteBar = document.createElement('div');
+    paletteBar.className = 'ed-palette';
+    for (const item of EDITOR_PALETTE) {
+      const btn = document.createElement('button');
+      btn.className = 'ed-swatch' + (item === this.selected ? ' active' : '');
+      btn.dataset.id = item.id;
+      btn.innerHTML = `<span class="dot" style="background:${item.color}"></span>${item.label}`;
+      btn.addEventListener('click', () => {
+        this.selected = item;
+        paletteBar.querySelectorAll('.ed-swatch').forEach((el) => {
+          el.classList.toggle('active', el.dataset.id === item.id);
+        });
+      });
+      paletteBar.appendChild(btn);
+    }
+    this.uiRoot.appendChild(paletteBar);
+
+    this.toastEl = document.createElement('div');
+    this.toastEl.className = 'ed-toast';
+    this.uiRoot.appendChild(this.toastEl);
+
+    header.addEventListener('click', (e) => {
+      const act = e.target?.dataset?.act;
+      if (!act) return;
+      if (act === 'play') this.toggle();
+      else if (act === 'export') this.exportJSON();
+      else if (act === 'import') this.importJSON();
+      else if (act === 'reset') {
+        this.game.loadStage(this.game.stageIndex, true);
+        this.showToast('已重置為內建關卡');
+      }
+    });
+  }
+
+  _bindEvents() {
+    const getTileCoords = (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const nx = (e.clientX - rect.left) / rect.width;
+      const ny = (e.clientY - rect.top) / rect.height;
+      const wx = nx * GAME_WIDTH + this.game.camera.x;
+      const wy = ny * GAME_HEIGHT + this.game.camera.y;
+      return {
+        tx: Math.floor(wx / TILE_SIZE),
+        ty: Math.floor(wy / TILE_SIZE),
+      };
+    };
+
+    this.canvas.addEventListener('contextmenu', (e) => {
+      if (this.active) e.preventDefault();
+    });
+
+    this.canvas.addEventListener('pointerdown', (e) => {
+      if (!this.active) return;
+      this.mouseDownBtn = e.button;
+      const { tx, ty } = getTileCoords(e);
+      this.hoverTx = tx;
+      this.hoverTy = ty;
+      this._applyAt(tx, ty, e.button === 2);
+    });
+
+    this.canvas.addEventListener('pointermove', (e) => {
+      if (!this.active) return;
+      const { tx, ty } = getTileCoords(e);
+      const changed = tx !== this.hoverTx || ty !== this.hoverTy;
+      this.hoverTx = tx;
+      this.hoverTy = ty;
+      if (this.mouseDownBtn !== -1 && changed) {
+        this._applyAt(tx, ty, this.mouseDownBtn === 2);
+      }
+    });
+
+    window.addEventListener('pointerup', () => {
+      this.mouseDownBtn = -1;
+    });
+  }
+
+  toggle() {
+    this.active = !this.active;
+    if (this.uiRoot) {
+      this.uiRoot.classList.toggle('open', this.active);
+    }
+    if (this.active) {
+      this.game.sound.setBgmMode('off');
+      this.showToast('編輯模式：滑鼠直接繪製，按 F2 即時試玩');
+    } else {
+      this.game.rebuildRuntimeFromLevel();
+      this.game.sound.setBgmMode(this.game.phase);
+    }
+  }
+
+  showToast(msg) {
+    this.toastText = msg;
+    this.toastTimer = 2.6;
+    if (this.toastEl) {
+      this.toastEl.textContent = msg;
+      this.toastEl.classList.add('show');
+    }
+  }
+
+  update(dt, input) {
+    if (this.toastTimer > 0) {
+      this.toastTimer -= dt;
+      if (this.toastTimer <= 0 && this.toastEl) {
+        this.toastEl.classList.remove('show');
+      }
+    }
+    if (!this.active) return;
+    const panSpeed = 240;
+    const dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const dy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+    this.game.camera.x = Math.max(
+      0,
+      Math.min(this.game.level.widthPx - GAME_WIDTH, this.game.camera.x + dx * panSpeed * dt)
+    );
+    this.game.camera.y = Math.max(
+      0,
+      Math.min(this.game.level.heightPx - GAME_HEIGHT, this.game.camera.y + dy * panSpeed * dt)
+    );
+  }
+
+  _applyAt(tx, ty, erase) {
+    const level = this.game.level;
+    if (!level || tx < 0 || tx >= level.width || ty < 0 || ty >= level.height) return;
+
+    const px = tx * TILE_SIZE;
+    const py = ty * TILE_SIZE;
+
+    // Helper to remove any entity spawn at this cell
+    const removeEntityAtCell = () => {
+      level.entitySpawns = level.entitySpawns.filter((sp) => {
+        const stx = Math.floor((sp.x + 2) / TILE_SIZE);
+        const sty = Math.floor((sp.y + 4) / TILE_SIZE);
+        return !(stx === tx && sty === ty);
+      });
+    };
+
+    if (erase) {
+      level.setTile(tx, ty, TILE.EMPTY);
+      removeEntityAtCell();
+      this.game.rebuildRuntimeFromLevel(false);
+      return;
+    }
+
+    const sel = this.selected;
+    if (sel.kind === 'tile') {
+      level.setTile(tx, ty, sel.tile);
+      if (sel.tile !== TILE.EMPTY) removeEntityAtCell();
+    } else if (sel.kind === 'spawn') {
+      level.setTile(tx, ty, TILE.EMPTY);
+      level.spawn = { x: px, y: py - 2 };
+      this.game.player.reset(level.spawn.x, level.spawn.y);
+    } else if (sel.kind === 'goal') {
+      // Clear previous goal tiles
+      for (let i = 0; i < level.tiles.length; i++) {
+        if (level.tiles[i] === TILE.GOAL_GATE) level.tiles[i] = TILE.EMPTY;
+      }
+      level.setTile(tx, ty, TILE.GOAL_GATE);
+      level.goal = { x: px, y: py };
+    } else if (sel.kind === 'entity') {
+      level.setTile(tx, ty, TILE.EMPTY);
+      removeEntityAtCell();
+      let spawn = null;
+      if (sel.ent === 'coin') spawn = { type: 'coin', x: px + 3, y: py + 3 };
+      else if (sel.ent === 'dash_crystal') spawn = { type: 'dash_crystal', x: px + 2, y: py + 2 };
+      else if (sel.ent === 'spring') spawn = { type: 'spring', x: px, y: py };
+      else if (sel.ent === 'checkpoint') spawn = { type: 'checkpoint', x: px, y: py - 8 };
+      else if (sel.ent === 'slime') spawn = { type: 'slime', x: px, y: py + 2 };
+      else if (sel.ent === 'beetle') spawn = { type: 'beetle', x: px, y: py + 2 };
+      else if (sel.ent === 'wisp_solar') spawn = { type: 'wisp', x: px, y: py, phase: PHASE.SOLAR };
+      else if (sel.ent === 'wisp_lunar') spawn = { type: 'wisp', x: px, y: py, phase: PHASE.LUNAR };
+      else if (sel.ent === 'heart') spawn = { type: 'heart', x: px + 3, y: py + 3 };
+      if (spawn) level.entitySpawns.push(spawn);
+    }
+
+    this.game.rebuildRuntimeFromLevel(false);
+  }
+
+  exportJSON() {
+    const level = this.game.level;
+    const data = {
+      version: 1,
+      name: `${level.name} (Custom)`,
+      width: level.width,
+      height: level.height,
+      startPhase: this.game.phase,
+      spawn: level.spawn,
+      goal: level.goal,
+      tiles: Array.from(level.tiles),
+      entitySpawns: level.entitySpawns,
+    };
+    const json = JSON.stringify(data, null, 2);
+
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(json).catch(() => {});
+    }
+
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chroma-knight-stage-${level.id}-custom.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.showToast('已下載 JSON 並複製到剪貼簿！');
+  }
+
+  importJSON() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(String(reader.result));
+          if (!Array.isArray(data.tiles) || !data.width || !data.height) {
+            throw new Error('格式不符');
+          }
+          const level = this.game.level;
+          level.width = data.width;
+          level.height = data.height;
+          level.widthPx = data.width * TILE_SIZE;
+          level.heightPx = data.height * TILE_SIZE;
+          level.tiles = new Uint8Array(data.tiles);
+          level.bumpOffsets = new Float32Array(data.width * data.height);
+          level.crumbleTimers.clear();
+          level.spawn = data.spawn || level.spawn;
+          level.goal = data.goal || level.goal;
+          level.entitySpawns = Array.isArray(data.entitySpawns) ? data.entitySpawns : [];
+          if (data.name) level.name = data.name;
+          this.game.rebuildRuntimeFromLevel(true);
+          this.showToast('已成功匯入自訂關卡 JSON！');
+        } catch (err) {
+          this.showToast('JSON 匯入失敗：' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
   }
 }
 
@@ -2766,8 +3486,9 @@ class PrismGolemBoss {
 
 // === src/renderer.js ===
 class Renderer {
-  constructor(canvas, atlas) {
+  constructor(canvas, atlas, displayCanvas = null) {
     this.canvas = canvas;
+    this.displayCanvas = displayCanvas || canvas;
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.atlas = atlas;
     this.scale = 2;
@@ -2788,7 +3509,7 @@ class Renderer {
   }
 
   resize() {
-    const rect = this.canvas.getBoundingClientRect();
+    const rect = this.displayCanvas.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const targetW = Math.max(960, Math.round((rect.width || 960) * dpr));
     const targetH = Math.max(540, Math.round((rect.height || 540) * dpr));
@@ -2839,11 +3560,19 @@ class Renderer {
       this._drawProjectiles(ctx, game.projectiles, phase, time);
     }
 
-    // 4. Player Afterimages + Cape + Player Sprite
+    // 4. Ghost Replay + Player Afterimages + Cape + Player Sprite
+    if (game.state === STATE.PLAYING && !(game.editor && game.editor.active)) {
+      this._drawGhost(ctx, game, time);
+    }
     if (player && !player.dead && game.state !== STATE.TITLE) {
       this._drawAfterimages(ctx, particles.afterimages);
       this._drawCape(ctx, player, pal);
       this._drawPlayer(ctx, player, phase, time);
+    }
+
+    // 4b. Real-Time Water Surface Reflections
+    if (level) {
+      this._drawWaterReflections(ctx, game, camX, time);
     }
 
     // 5. Particles & Ripples
@@ -2854,6 +3583,11 @@ class Renderer {
     // 6. Dynamic 2D Additive Lighting Pass
     if (level) {
       this._drawDynamicLights(ctx, game, phase, time);
+    }
+
+    // 6b. Live Level Editor Grid & Cursor
+    if (game.editor && game.editor.active) {
+      this._drawEditorOverlay(ctx, game.editor, camX);
     }
 
     ctx.restore();
@@ -3261,6 +3995,113 @@ class Renderer {
     }
   }
 
+  _drawGhost(ctx, game, time) {
+    const gf = game.ghost.getPlaybackFrame(game.stageTime);
+    if (!gf) return;
+    const set = this.atlas.player[gf.phase];
+    const r = gf.facing >= 0;
+    let spr = r ? set.idleR : set.idleL;
+    if (gf.pose === 2) spr = r ? set.jumpR : set.jumpL;
+    else if (gf.pose === 1) spr = Math.floor(time * 10) % 2 === 0 ? (r ? set.run1R : set.run1L) : (r ? set.run2R : set.run2L);
+
+    ctx.save();
+    ctx.globalAlpha = 0.42 + Math.sin(time * 8) * 0.08;
+    ctx.drawImage(spr, Math.round(gf.x - 3), Math.round(gf.y - 3));
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(84, 240, 255, 0.22)';
+    ctx.beginPath();
+    ctx.arc(gf.x + 5, gf.y + 7, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  _drawWaterReflections(ctx, game, camX, time) {
+    const { level, player, enemies, phase } = game;
+    const startTx = Math.max(0, Math.floor(camX / TILE_SIZE) - 1);
+    const endTx = Math.min(level.width - 1, Math.ceil((camX + GAME_WIDTH) / TILE_SIZE) + 1);
+
+    // Collect contiguous water surface spans
+    const waterSpans = [];
+    for (let ty = 0; ty < level.height; ty++) {
+      let spanStart = -1;
+      for (let tx = startTx; tx <= endTx + 1; tx++) {
+        const isWater = tx <= endTx && level.getTile(tx, ty) === TILE.WATER && level.getTile(tx, ty - 1) !== TILE.WATER;
+        if (isWater && spanStart === -1) spanStart = tx;
+        else if (!isWater && spanStart !== -1) {
+          waterSpans.push({ x: spanStart * TILE_SIZE, y: ty * TILE_SIZE + 3, w: (tx - spanStart) * TILE_SIZE, h: 13 });
+          spanStart = -1;
+        }
+      }
+    }
+    if (!waterSpans.length) return;
+
+    for (const sp of waterSpans) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(sp.x, sp.y, sp.w, sp.h);
+      ctx.clip();
+
+      const waveShift = Math.sin(time * 6 + sp.x * 0.1) * 1.4;
+      ctx.globalAlpha = 0.36;
+
+      // Mirror player if above this water span
+      if (player && !player.dead && player.x + player.w > sp.x - 16 && player.x < sp.x + sp.w + 16) {
+        const distAbove = sp.y - (player.y + player.h);
+        if (distAbove >= -8 && distAbove < 48) {
+          const spr = player.getSprite(this.atlas, phase);
+          ctx.save();
+          ctx.translate(Math.round(player.x + player.w * 0.5 + waveShift), Math.round(sp.y + distAbove));
+          ctx.scale(1, -0.78);
+          ctx.drawImage(spr, -8, -18);
+          ctx.restore();
+        }
+      }
+
+      // Mirror nearby enemies
+      for (const e of enemies) {
+        if (!e.alive || e.x + e.w < sp.x - 12 || e.x > sp.x + sp.w + 12) continue;
+        const distAbove = sp.y - (e.y + e.h);
+        if (distAbove >= -6 && distAbove < 40) {
+          ctx.fillStyle = e.type === 'slime' ? '#6df07c' : '#ff7582';
+          ctx.fillRect(Math.round(e.x + waveShift), Math.round(sp.y + distAbove * 0.6), e.w, 6);
+        }
+      }
+
+      // Animated horizontal water shimmer ripples
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = phase === PHASE.LUNAR ? '#a6f9ff' : '#d6fbff';
+      for (let rx = sp.x + 2; rx < sp.x + sp.w - 4; rx += 10) {
+        const wy = sp.y + 3 + ((rx * 3) % 6);
+        const shift = Math.sin(time * 5 + rx * 0.25) * 2;
+        ctx.fillRect(Math.round(rx + shift), wy, 5, 1);
+      }
+      ctx.restore();
+    }
+  }
+
+  _drawEditorOverlay(ctx, editor, camX) {
+    const startTx = Math.max(0, Math.floor(camX / TILE_SIZE));
+    const endTx = Math.min(this.gameWidth || 200, Math.ceil((camX + GAME_WIDTH) / TILE_SIZE) + 1);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for (let tx = startTx; tx <= endTx; tx++) {
+      ctx.moveTo(tx * TILE_SIZE, 0);
+      ctx.lineTo(tx * TILE_SIZE, 17 * TILE_SIZE);
+    }
+    for (let ty = 0; ty <= 17; ty++) {
+      ctx.moveTo(startTx * TILE_SIZE, ty * TILE_SIZE);
+      ctx.lineTo(endTx * TILE_SIZE, ty * TILE_SIZE);
+    }
+    ctx.stroke();
+
+    if (editor.hoverTx >= 0 && editor.hoverTy >= 0) {
+      ctx.strokeStyle = editor.selected.color || '#4af7c8';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(editor.hoverTx * TILE_SIZE + 0.5, editor.hoverTy * TILE_SIZE + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+    }
+  }
+
   _drawPlayer(ctx, player, phase, time) {
     if (player.invulnTimer > 0 && Math.floor(time * 20) % 2 === 0) return;
     const spr = player.getSprite(this.atlas, phase);
@@ -3425,6 +4266,12 @@ class Renderer {
 
     ctx.fillStyle = '#a7bce8';
     ctx.fillText(`${game.stageTime.toFixed(1)}s`, W - 12, 26);
+    if (game.ghost.bestRun) {
+      const delta = game.stageTime - game.ghost.bestRun.time;
+      ctx.font = '700 12px ui-monospace, monospace';
+      ctx.fillStyle = delta <= 0 ? '#4af7c8' : '#ff8a9e';
+      ctx.fillText(`BEST ${game.ghost.bestRun.time.toFixed(1)}s`, W - 12, 58);
+    }
     ctx.textAlign = 'left';
 
     // Combo Badge
@@ -3607,11 +4454,14 @@ class Renderer {
 
 // === src/game.js ===
 class Game {
-  constructor(atlas, sound, onPhaseChange) {
+  constructor(atlas, sound, onPhaseChange, onAberration = null) {
     this.atlas = atlas;
     this.sound = sound;
     this.onPhaseChange = onPhaseChange;
+    this.onAberration = onAberration;
     this.particles = new ParticleSystem();
+    this.ghost = new GhostSystem();
+    this.editor = null;
 
     this.state = STATE.TITLE;
     this.stageIndex = 0;
@@ -3651,12 +4501,26 @@ class Game {
     const def = STAGE_DEFS[this.stageIndex];
     this.level = new Level(def);
     this.phase = def.startPhase;
+    this.rebuildRuntimeFromLevel(true);
+
+    if (this.onPhaseChange) this.onPhaseChange(this.phase);
+    if (enterPlaying) {
+      this.state = STATE.PLAYING;
+      this.sound.setBgmMode(this.phase);
+    }
+  }
+
+  rebuildRuntimeFromLevel(resetPlayer = true) {
     this.stageTime = 0;
     this.combo = 0;
     this.comboTimer = 0;
     this.hitstop = 0;
 
-    this.player = new Player(this.level.spawn.x, this.level.spawn.y);
+    if (resetPlayer || !this.player) {
+      this.player = new Player(this.level.spawn.x, this.level.spawn.y);
+      this.camera.x = Math.max(0, this.player.cx - GAME_WIDTH * 0.35);
+      this.camera.y = 0;
+    }
     this.coinsList = [];
     this.hearts = [];
     this.dashCrystals = [];
@@ -3685,16 +4549,8 @@ class Game {
     this.particles.clear();
     this.particles.initGrass(this.level);
     this.particles.initAmbient(this.level.widthPx, this.level.heightPx);
-
-    this.camera.x = Math.max(0, this.player.cx - GAME_WIDTH * 0.35);
-    this.camera.y = 0;
     this.camera.shake = 0;
-
-    if (this.onPhaseChange) this.onPhaseChange(this.phase);
-    if (enterPlaying) {
-      this.state = STATE.PLAYING;
-      this.sound.setBgmMode(this.phase);
-    }
+    this.ghost.startStage(this.level.id);
   }
 
   respawnAtCheckpoint() {
@@ -3708,6 +4564,9 @@ class Game {
 
   addShake(amount) {
     this.camera.shake = Math.max(this.camera.shake, amount);
+    if (amount >= 6 && this.onAberration) {
+      this.onAberration(Math.min(1.2, amount * 0.09));
+    }
   }
 
   addScore(pts, x, y, label) {
@@ -3721,6 +4580,7 @@ class Game {
     this.phase = this.phase === PHASE.SOLAR ? PHASE.LUNAR : PHASE.SOLAR;
     const isLunar = this.phase === PHASE.LUNAR;
     this.sound.playPhaseShift(isLunar);
+    if (this.onAberration) this.onAberration(1.0);
     if (!this.boss || !this.boss.active || !this.boss.alive) {
       this.sound.setBgmMode(this.phase);
     }
@@ -3851,6 +4711,13 @@ class Game {
       return;
     }
 
+    // --- LIVE EDITOR MODE ---
+    if (this.editor && this.editor.active) {
+      this.editor.update(dt, input);
+      if (input.phasePressed) this.togglePhase();
+      return;
+    }
+
     // --- PLAYING STATE ---
     if (input.pausePressed) {
       this.state = STATE.PAUSED;
@@ -3872,6 +4739,7 @@ class Game {
     }
 
     this.stageTime += dt;
+    this.ghost.recordFrame(dt, this.player, this.phase);
     if (this.comboTimer > 0) {
       this.comboTimer -= dt;
       if (this.comboTimer <= 0) this.combo = 0;
@@ -3904,9 +4772,10 @@ class Game {
       Math.abs(this.player.cx - (gx + 8)) < 16 &&
       Math.abs(this.player.cy - (gy - 4)) < 24
     ) {
+      const isNewRecord = this.ghost.finishStage(this.stageTime);
       this.sound.playVictory();
       this.sound.setBgmMode('off');
-      this.addScore(1000, gx + 8, gy - 16, 'CLEAR +1000!');
+      this.addScore(1000, gx + 8, gy - 16, isNewRecord ? 'NEW RECORD!' : 'CLEAR +1000!');
       this.particles.burst(gx + 8, gy - 4, 34, '#ffe066', { speedMax: 180, glow: true });
       if (this.stageIndex >= STAGE_DEFS.length - 1) {
         this.state = STATE.VICTORY;
@@ -3947,14 +4816,19 @@ class Game {
 }
 
 // === src/main.js ===
-const canvas = document.getElementById('game');
+const displayCanvas = document.getElementById('game');
 const canvasWrap = document.getElementById('canvas-wrap');
 const crtOverlay = document.getElementById('crt-overlay');
 const phasePill = document.getElementById('phase-pill');
+const editorRoot = document.getElementById('editor-ui');
 
 const sound = new SoundEngine();
 const atlas = createSpriteAtlas();
-const renderer = new Renderer(canvas, atlas);
+
+// Initialize WebGL Post-Processing Pipeline (with graceful Canvas2D fallback)
+const post = new WebGLPostProcessor(displayCanvas);
+const renderCanvas = post.supported ? document.createElement('canvas') : displayCanvas;
+const renderer = new Renderer(renderCanvas, atlas, displayCanvas);
 window.addEventListener('resize', () => renderer.resize());
 
 function syncPhaseUI(phase) {
@@ -3965,14 +4839,18 @@ function syncPhaseUI(phase) {
   phasePill.textContent = isLunar ? 'LUNAR 星月' : 'SOLAR 熾陽';
 }
 
-const game = new Game(atlas, sound, syncPhaseUI);
+const game = new Game(atlas, sound, syncPhaseUI, (strength) => {
+  post.triggerAberration(strength);
+});
+const editor = new LevelEditor(displayCanvas, game, editorRoot);
+game.editor = editor;
 
 // --- INPUT MANAGER (Keyboard + Gamepad) ---
 const keys = new Set();
 const justPressed = new Set();
 
 const PREVENT_KEYS = new Set([
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'F3',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'F2', 'F3',
 ]);
 
 window.addEventListener('keydown', (e) => {
@@ -3987,6 +4865,27 @@ window.addEventListener('keydown', (e) => {
     sound.toggleMute();
   } else if (e.code === 'KeyV') {
     crtOverlay.classList.toggle('crt-on');
+  } else if (e.code === 'KeyG') {
+    post.enabled = !post.enabled;
+    game.particles.spawnText(
+      game.player.cx,
+      game.player.y - 8,
+      post.enabled ? 'SHADER ON' : 'SHADER OFF',
+      '#7eeeff'
+    );
+  } else if (e.code === 'KeyT') {
+    game.ghost.enabled = !game.ghost.enabled;
+    game.particles.spawnText(
+      game.player.cx,
+      game.player.y - 8,
+      game.ghost.enabled ? 'GHOST ON' : 'GHOST OFF',
+      '#4af7c8'
+    );
+  } else if (e.code === 'F2') {
+    if (game.state === STATE.TITLE) {
+      game.loadStage(0, true);
+    }
+    editor.toggle();
   } else if (e.code === 'F3') {
     game.showDebug = !game.showDebug;
   }
@@ -4000,7 +4899,7 @@ window.addEventListener('blur', () => {
   keys.clear();
 });
 
-canvas.addEventListener('pointerdown', () => {
+displayCanvas.addEventListener('pointerdown', () => {
   sound.unlock();
 });
 
@@ -4076,6 +4975,7 @@ function loop(now) {
   while (accumulator >= STEP) {
     const input = readInput();
     game.update(STEP, input);
+    post.update(STEP, game.phase === PHASE.LUNAR);
     accumulator -= STEP;
     stepped = true;
   }
@@ -4084,6 +4984,9 @@ function loop(now) {
   }
 
   renderer.render(game);
+  if (post.supported) {
+    post.render(renderCanvas, game.time);
+  }
   requestAnimationFrame(loop);
 }
 

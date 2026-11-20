@@ -1,8 +1,9 @@
 import { GAME_WIDTH, GAME_HEIGHT, TILE, TILE_SIZE, PHASE, PALETTES, STATE } from './constants.js';
 
 export class Renderer {
-  constructor(canvas, atlas) {
+  constructor(canvas, atlas, displayCanvas = null) {
     this.canvas = canvas;
+    this.displayCanvas = displayCanvas || canvas;
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.atlas = atlas;
     this.scale = 2;
@@ -23,7 +24,7 @@ export class Renderer {
   }
 
   resize() {
-    const rect = this.canvas.getBoundingClientRect();
+    const rect = this.displayCanvas.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const targetW = Math.max(960, Math.round((rect.width || 960) * dpr));
     const targetH = Math.max(540, Math.round((rect.height || 540) * dpr));
@@ -74,11 +75,19 @@ export class Renderer {
       this._drawProjectiles(ctx, game.projectiles, phase, time);
     }
 
-    // 4. Player Afterimages + Cape + Player Sprite
+    // 4. Ghost Replay + Player Afterimages + Cape + Player Sprite
+    if (game.state === STATE.PLAYING && !(game.editor && game.editor.active)) {
+      this._drawGhost(ctx, game, time);
+    }
     if (player && !player.dead && game.state !== STATE.TITLE) {
       this._drawAfterimages(ctx, particles.afterimages);
       this._drawCape(ctx, player, pal);
       this._drawPlayer(ctx, player, phase, time);
+    }
+
+    // 4b. Real-Time Water Surface Reflections
+    if (level) {
+      this._drawWaterReflections(ctx, game, camX, time);
     }
 
     // 5. Particles & Ripples
@@ -89,6 +98,11 @@ export class Renderer {
     // 6. Dynamic 2D Additive Lighting Pass
     if (level) {
       this._drawDynamicLights(ctx, game, phase, time);
+    }
+
+    // 6b. Live Level Editor Grid & Cursor
+    if (game.editor && game.editor.active) {
+      this._drawEditorOverlay(ctx, game.editor, camX);
     }
 
     ctx.restore();
@@ -496,6 +510,113 @@ export class Renderer {
     }
   }
 
+  _drawGhost(ctx, game, time) {
+    const gf = game.ghost.getPlaybackFrame(game.stageTime);
+    if (!gf) return;
+    const set = this.atlas.player[gf.phase];
+    const r = gf.facing >= 0;
+    let spr = r ? set.idleR : set.idleL;
+    if (gf.pose === 2) spr = r ? set.jumpR : set.jumpL;
+    else if (gf.pose === 1) spr = Math.floor(time * 10) % 2 === 0 ? (r ? set.run1R : set.run1L) : (r ? set.run2R : set.run2L);
+
+    ctx.save();
+    ctx.globalAlpha = 0.42 + Math.sin(time * 8) * 0.08;
+    ctx.drawImage(spr, Math.round(gf.x - 3), Math.round(gf.y - 3));
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(84, 240, 255, 0.22)';
+    ctx.beginPath();
+    ctx.arc(gf.x + 5, gf.y + 7, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  _drawWaterReflections(ctx, game, camX, time) {
+    const { level, player, enemies, phase } = game;
+    const startTx = Math.max(0, Math.floor(camX / TILE_SIZE) - 1);
+    const endTx = Math.min(level.width - 1, Math.ceil((camX + GAME_WIDTH) / TILE_SIZE) + 1);
+
+    // Collect contiguous water surface spans
+    const waterSpans = [];
+    for (let ty = 0; ty < level.height; ty++) {
+      let spanStart = -1;
+      for (let tx = startTx; tx <= endTx + 1; tx++) {
+        const isWater = tx <= endTx && level.getTile(tx, ty) === TILE.WATER && level.getTile(tx, ty - 1) !== TILE.WATER;
+        if (isWater && spanStart === -1) spanStart = tx;
+        else if (!isWater && spanStart !== -1) {
+          waterSpans.push({ x: spanStart * TILE_SIZE, y: ty * TILE_SIZE + 3, w: (tx - spanStart) * TILE_SIZE, h: 13 });
+          spanStart = -1;
+        }
+      }
+    }
+    if (!waterSpans.length) return;
+
+    for (const sp of waterSpans) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(sp.x, sp.y, sp.w, sp.h);
+      ctx.clip();
+
+      const waveShift = Math.sin(time * 6 + sp.x * 0.1) * 1.4;
+      ctx.globalAlpha = 0.36;
+
+      // Mirror player if above this water span
+      if (player && !player.dead && player.x + player.w > sp.x - 16 && player.x < sp.x + sp.w + 16) {
+        const distAbove = sp.y - (player.y + player.h);
+        if (distAbove >= -8 && distAbove < 48) {
+          const spr = player.getSprite(this.atlas, phase);
+          ctx.save();
+          ctx.translate(Math.round(player.x + player.w * 0.5 + waveShift), Math.round(sp.y + distAbove));
+          ctx.scale(1, -0.78);
+          ctx.drawImage(spr, -8, -18);
+          ctx.restore();
+        }
+      }
+
+      // Mirror nearby enemies
+      for (const e of enemies) {
+        if (!e.alive || e.x + e.w < sp.x - 12 || e.x > sp.x + sp.w + 12) continue;
+        const distAbove = sp.y - (e.y + e.h);
+        if (distAbove >= -6 && distAbove < 40) {
+          ctx.fillStyle = e.type === 'slime' ? '#6df07c' : '#ff7582';
+          ctx.fillRect(Math.round(e.x + waveShift), Math.round(sp.y + distAbove * 0.6), e.w, 6);
+        }
+      }
+
+      // Animated horizontal water shimmer ripples
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = phase === PHASE.LUNAR ? '#a6f9ff' : '#d6fbff';
+      for (let rx = sp.x + 2; rx < sp.x + sp.w - 4; rx += 10) {
+        const wy = sp.y + 3 + ((rx * 3) % 6);
+        const shift = Math.sin(time * 5 + rx * 0.25) * 2;
+        ctx.fillRect(Math.round(rx + shift), wy, 5, 1);
+      }
+      ctx.restore();
+    }
+  }
+
+  _drawEditorOverlay(ctx, editor, camX) {
+    const startTx = Math.max(0, Math.floor(camX / TILE_SIZE));
+    const endTx = Math.min(this.gameWidth || 200, Math.ceil((camX + GAME_WIDTH) / TILE_SIZE) + 1);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for (let tx = startTx; tx <= endTx; tx++) {
+      ctx.moveTo(tx * TILE_SIZE, 0);
+      ctx.lineTo(tx * TILE_SIZE, 17 * TILE_SIZE);
+    }
+    for (let ty = 0; ty <= 17; ty++) {
+      ctx.moveTo(startTx * TILE_SIZE, ty * TILE_SIZE);
+      ctx.lineTo(endTx * TILE_SIZE, ty * TILE_SIZE);
+    }
+    ctx.stroke();
+
+    if (editor.hoverTx >= 0 && editor.hoverTy >= 0) {
+      ctx.strokeStyle = editor.selected.color || '#4af7c8';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(editor.hoverTx * TILE_SIZE + 0.5, editor.hoverTy * TILE_SIZE + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+    }
+  }
+
   _drawPlayer(ctx, player, phase, time) {
     if (player.invulnTimer > 0 && Math.floor(time * 20) % 2 === 0) return;
     const spr = player.getSprite(this.atlas, phase);
@@ -660,6 +781,12 @@ export class Renderer {
 
     ctx.fillStyle = '#a7bce8';
     ctx.fillText(`${game.stageTime.toFixed(1)}s`, W - 12, 26);
+    if (game.ghost.bestRun) {
+      const delta = game.stageTime - game.ghost.bestRun.time;
+      ctx.font = '700 12px ui-monospace, monospace';
+      ctx.fillStyle = delta <= 0 ? '#4af7c8' : '#ff8a9e';
+      ctx.fillText(`BEST ${game.ghost.bestRun.time.toFixed(1)}s`, W - 12, 58);
+    }
     ctx.textAlign = 'left';
 
     // Combo Badge
