@@ -12,6 +12,7 @@ const phasePill = document.getElementById('phase-pill');
 const sound = new SoundEngine();
 const atlas = createSpriteAtlas();
 const renderer = new Renderer(canvas, atlas);
+window.addEventListener('resize', () => renderer.resize());
 
 function syncPhaseUI(phase) {
   const isLunar = phase === PHASE.LUNAR;

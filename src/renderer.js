@@ -3,9 +3,11 @@ import { GAME_WIDTH, GAME_HEIGHT, TILE, TILE_SIZE, PHASE, PALETTES, STATE } from
 export class Renderer {
   constructor(canvas, atlas) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.ctx.imageSmoothingEnabled = false;
+    this.ctx = canvas.getContext('2d', { alpha: false });
     this.atlas = atlas;
+    this.scale = 2;
+    this.dpr = 1;
+    this.resize();
 
     // Pre-generate starfield for Lunar sky
     this.stars = [];
@@ -20,10 +22,28 @@ export class Renderer {
     }
   }
 
+  resize() {
+    const rect = this.canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const targetW = Math.max(960, Math.round((rect.width || 960) * dpr));
+    const targetH = Math.max(540, Math.round((rect.height || 540) * dpr));
+    if (this.canvas.width !== targetW || this.canvas.height !== targetH) {
+      this.canvas.width = targetW;
+      this.canvas.height = targetH;
+    }
+    this.dpr = dpr;
+    this.scale = this.canvas.width / GAME_WIDTH;
+  }
+
   render(game) {
     const ctx = this.ctx;
     const { phase, time, level, player, particles, camera } = game;
     const pal = PALETTES[phase];
+
+    // --- PASS 1: CRISP PIXEL-ART WORLD (scaled cleanly to native HiDPI) ---
+    ctx.save();
+    ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
+    ctx.imageSmoothingEnabled = false;
 
     // 1. Sky & Parallax Background
     this._drawBackground(ctx, pal, phase, time, camera.x);
@@ -61,11 +81,10 @@ export class Renderer {
       this._drawPlayer(ctx, player, phase, time);
     }
 
-    // 5. Particles, Ripples, Floating Texts
+    // 5. Particles & Ripples
     this._drawAmbient(ctx, particles.ambient, phase, time);
     this._drawParticles(ctx, particles.particles);
     this._drawRipples(ctx, particles.ripples);
-    this._drawTexts(ctx, particles.texts);
 
     // 6. Dynamic 2D Additive Lighting Pass
     if (level) {
@@ -74,11 +93,20 @@ export class Renderer {
 
     ctx.restore();
 
-    // 7. Subtle Phase Vignette / Ambient Tint
+    // 7. Subtle Phase Ambient Tint
     ctx.fillStyle = pal.ambient;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    ctx.restore();
 
-    // 8. HUD & Overlays
+    // --- PASS 2: NATIVE HI-RES UI, FLOATING TEXT & OVERLAYS (960x540 logical) ---
+    const uiScale = this.canvas.width / 960;
+    ctx.save();
+    ctx.setTransform(uiScale, 0, 0, uiScale, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+
+    // Floating combat/score texts rendered in crisp Hi-Res
+    this._drawTextsHD(ctx, particles.texts, camX, camY);
+
     if (game.state === STATE.TITLE) {
       this._drawTitleScreen(ctx, game, time);
     } else {
@@ -89,6 +117,7 @@ export class Renderer {
       else if (game.state === STATE.VICTORY) this._drawVictory(ctx, game, time);
       else if (game.state === STATE.GAME_OVER) this._drawGameOver(ctx, game);
     }
+    ctx.restore();
   }
 
   _drawBackground(ctx, pal, phase, time, camX) {
@@ -510,15 +539,18 @@ export class Renderer {
     }
   }
 
-  _drawTexts(ctx, texts) {
-    ctx.font = 'bold 8px monospace';
+  _drawTextsHD(ctx, texts, camX, camY) {
+    ctx.font = '700 14px ui-monospace, "Noto Sans TC", "Microsoft JhengHei", sans-serif';
     ctx.textAlign = 'center';
     for (const t of texts) {
+      const sx = (t.x - camX) * 2;
+      const sy = (t.y - camY) * 2;
       ctx.globalAlpha = Math.min(1, (t.life / t.maxLife) * 1.4);
-      ctx.fillStyle = '#0d0c18';
-      ctx.fillText(t.text, Math.round(t.x) + 1, Math.round(t.y) + 1);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(10, 10, 22, 0.9)';
+      ctx.strokeText(t.text, sx, sy);
       ctx.fillStyle = t.color;
-      ctx.fillText(t.text, Math.round(t.x), Math.round(t.y));
+      ctx.fillText(t.text, sx, sy);
     }
     ctx.globalAlpha = 1;
     ctx.textAlign = 'left';
@@ -575,210 +607,235 @@ export class Renderer {
   }
 
   _drawHUD(ctx, game, time) {
-    // Top translucent bar
-    ctx.fillStyle = 'rgba(8, 10, 20, 0.56)';
-    ctx.fillRect(0, 0, GAME_WIDTH, 22);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.fillRect(0, 22, GAME_WIDTH, 1);
+    const W = 960;
+    const H = 540;
+    const UI_FONT = '"Noto Sans TC", "Microsoft JhengHei", ui-monospace, sans-serif';
 
-    // Hearts
+    // Top translucent bar
+    ctx.fillStyle = 'rgba(8, 10, 20, 0.64)';
+    ctx.fillRect(0, 0, W, 42);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fillRect(0, 42, W, 1);
+
+    // Hearts (2x crisp pixel icons)
     for (let i = 0; i < game.player.maxHp; i++) {
       ctx.globalAlpha = i < game.player.hp ? 1 : 0.22;
-      ctx.drawImage(this.atlas.items.heart, 8 + i * 12, 6);
+      ctx.drawImage(this.atlas.items.heart, 14 + i * 24, 12, 20, 18);
     }
     ctx.globalAlpha = 1;
 
     // Phase Pill
     const isLunar = game.phase === PHASE.LUNAR;
     ctx.fillStyle = isLunar ? 'rgba(56, 212, 255, 0.22)' : 'rgba(255, 178, 56, 0.24)';
-    ctx.fillRect(52, 5, 58, 12);
+    ctx.fillRect(98, 9, 118, 24);
     ctx.strokeStyle = isLunar ? '#4ae3ff' : '#ffbe44';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(52.5, 5.5, 57, 11);
-    ctx.font = 'bold 8px monospace';
-    ctx.fillStyle = isLunar ? '#8ff4ff' : '#ffe184';
-    ctx.fillText(isLunar ? 'LUNAR 星月' : 'SOLAR 熾陽', 56, 14);
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(98.5, 9.5, 117, 23);
+    ctx.font = `700 13px ${UI_FONT}`;
+    ctx.fillStyle = isLunar ? '#9ef6ff' : '#ffe38a';
+    ctx.fillText(isLunar ? 'LUNAR 星月' : 'SOLAR 熾陽', 109, 26);
 
     // Dash Ready indicator
     ctx.fillStyle = game.player.canDash ? '#4af7c8' : '#4a5068';
-    ctx.fillRect(116, 8, 6, 6);
-    ctx.fillStyle = '#c8d2eb';
-    ctx.fillText('DASH', 125, 14);
+    ctx.fillRect(228, 15, 11, 11);
+    ctx.fillStyle = game.player.canDash ? '#d8fff4' : '#7b849e';
+    ctx.font = `700 13px ${UI_FONT}`;
+    ctx.fillText('DASH', 245, 26);
 
     // Stage Name
-    ctx.fillStyle = '#dce4fa';
+    ctx.fillStyle = '#edf2ff';
+    ctx.font = `700 15px ${UI_FONT}`;
     ctx.textAlign = 'center';
-    ctx.fillText(game.level.name, GAME_WIDTH * 0.5, 14);
+    ctx.fillText(game.level.name, W * 0.5, 27);
 
     // Coins & Score & Timer
     ctx.textAlign = 'right';
-    ctx.drawImage(this.atlas.items.coin, GAME_WIDTH - 134, 6, 9, 9);
+    ctx.drawImage(this.atlas.items.coin, W - 266, 12, 18, 18);
+    ctx.font = `700 14px ui-monospace, monospace`;
     ctx.fillStyle = '#ffe169';
-    ctx.fillText(`${game.coins}`, GAME_WIDTH - 108, 14);
+    ctx.fillText(`${game.coins}`, W - 216, 26);
 
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`SCORE ${String(game.score).padStart(6, '0')}`, GAME_WIDTH - 42, 14);
+    ctx.fillText(`SCORE ${String(game.score).padStart(6, '0')}`, W - 82, 26);
 
-    ctx.fillStyle = '#9db0d8';
-    ctx.fillText(`${game.stageTime.toFixed(1)}s`, GAME_WIDTH - 6, 14);
+    ctx.fillStyle = '#a7bce8';
+    ctx.fillText(`${game.stageTime.toFixed(1)}s`, W - 12, 26);
     ctx.textAlign = 'left';
 
     // Combo Badge
     if (game.combo > 1 && game.comboTimer > 0) {
       ctx.fillStyle = '#ffdf5c';
-      ctx.font = 'bold 10px monospace';
-      ctx.fillText(`${game.combo}x COMBO!`, 8, 36);
+      ctx.font = `800 20px ui-monospace, sans-serif`;
+      ctx.fillText(`${game.combo}x COMBO!`, 16, 74);
     }
 
-    // Stage Hint (first 7 seconds)
+    // Stage Hint (first 7.5 seconds)
     if (game.stageTime < 7.5 && game.level.hint) {
       const alpha = game.stageTime > 6 ? (7.5 - game.stageTime) / 1.5 : 1;
       ctx.save();
-      ctx.globalAlpha = Math.max(0, alpha * 0.9);
-      ctx.fillStyle = 'rgba(10, 14, 28, 0.72)';
-      ctx.fillRect(36, GAME_HEIGHT - 22, GAME_WIDTH - 72, 16);
-      ctx.fillStyle = '#eaf2ff';
-      ctx.font = '8px monospace';
+      ctx.globalAlpha = Math.max(0, alpha * 0.94);
+      ctx.fillStyle = 'rgba(10, 14, 28, 0.78)';
+      ctx.fillRect(72, H - 44, W - 144, 30);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+      ctx.strokeRect(72.5, H - 43.5, W - 145, 29);
+      ctx.fillStyle = '#f0f5ff';
+      ctx.font = `600 14px ${UI_FONT}`;
       ctx.textAlign = 'center';
-      ctx.fillText(game.level.hint, GAME_WIDTH * 0.5, GAME_HEIGHT - 11);
+      ctx.fillText(game.level.hint, W * 0.5, H - 24);
       ctx.restore();
     }
 
     // Boss HP Bar
     if (game.boss && game.boss.alive && game.boss.active) {
-      const barW = 180;
-      const bx = (GAME_WIDTH - barW) * 0.5;
-      const by = 30;
-      ctx.fillStyle = 'rgba(10, 12, 24, 0.8)';
-      ctx.fillRect(bx - 4, by - 10, barW + 8, 20);
+      const barW = 360;
+      const bx = (W - barW) * 0.5;
+      const by = 60;
+      ctx.fillStyle = 'rgba(10, 12, 24, 0.84)';
+      ctx.fillRect(bx - 10, by - 20, barW + 20, 42);
       ctx.fillStyle = '#ff8a9e';
-      ctx.font = 'bold 8px monospace';
+      ctx.font = `700 14px ${UI_FONT}`;
       ctx.textAlign = 'center';
-      ctx.fillText('PRISM GOLEM — 稜鏡巨像', GAME_WIDTH * 0.5, by - 2);
+      ctx.fillText('PRISM GOLEM — 稜鏡巨像', W * 0.5, by - 3);
       ctx.fillStyle = '#2a2238';
-      ctx.fillRect(bx, by + 1, barW, 6);
+      ctx.fillRect(bx, by + 4, barW, 11);
       ctx.fillStyle = game.boss.bossPhase === PHASE.SOLAR ? '#ffae38' : '#4ae3ff';
-      ctx.fillRect(bx, by + 1, barW * (game.boss.hp / game.boss.maxHp), 6);
+      ctx.fillRect(bx, by + 4, barW * (game.boss.hp / game.boss.maxHp), 11);
       ctx.textAlign = 'left';
     }
   }
 
   _drawDebug(ctx, game) {
     const p = game.player;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-    ctx.fillRect(6, 40, 146, 56);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    ctx.fillRect(12, 80, 290, 108);
     ctx.fillStyle = '#7dffb2';
-    ctx.font = '7px monospace';
-    ctx.fillText(`FPS: ${game.fps} | ENT: ${game.enemies.length + game.particles.particles.length}`, 10, 50);
-    ctx.fillText(`POS: ${p.x.toFixed(1)}, ${p.y.toFixed(1)}`, 10, 60);
-    ctx.fillText(`VEL: ${p.vx.toFixed(0)}, ${p.vy.toFixed(0)} | GND:${p.onGround ? 1 : 0}`, 10, 70);
-    ctx.fillText(`COYOTE:${p.coyoteTimer.toFixed(2)} BUF:${p.jumpBufferTimer.toFixed(2)}`, 10, 80);
-    ctx.fillText(`PHASE:${game.phase.toUpperCase()} DASH:${p.canDash ? 'RDY' : 'CD'}`, 10, 90);
+    ctx.font = '13px ui-monospace, monospace';
+    ctx.fillText(`FPS: ${game.fps} | RES: ${this.canvas.width}x${this.canvas.height}`, 20, 100);
+    ctx.fillText(`POS: ${p.x.toFixed(1)}, ${p.y.toFixed(1)}`, 20, 118);
+    ctx.fillText(`VEL: ${p.vx.toFixed(0)}, ${p.vy.toFixed(0)} | GND:${p.onGround ? 1 : 0}`, 20, 136);
+    ctx.fillText(`COYOTE:${p.coyoteTimer.toFixed(2)} BUF:${p.jumpBufferTimer.toFixed(2)}`, 20, 154);
+    ctx.fillText(`PHASE:${game.phase.toUpperCase()} DASH:${p.canDash ? 'RDY' : 'CD'}`, 20, 172);
   }
 
   _drawTitleScreen(ctx, game, time) {
-    ctx.fillStyle = 'rgba(7, 9, 20, 0.45)';
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    const W = 960;
+    const H = 540;
+    const UI_FONT = '"Noto Sans TC", "Microsoft JhengHei", ui-monospace, sans-serif';
 
-    const bob = Math.sin(time * 3) * 3;
+    ctx.fillStyle = 'rgba(7, 9, 20, 0.44)';
+    ctx.fillRect(0, 0, W, H);
+
+    const bob = Math.sin(time * 3) * 6;
     ctx.textAlign = 'center';
 
     // Title
-    ctx.font = 'bold 28px monospace';
+    ctx.font = '900 58px ui-monospace, "Cascadia Mono", monospace';
     ctx.fillStyle = '#140c24';
-    ctx.fillText('CHROMA KNIGHT', GAME_WIDTH * 0.5 + 2, 86 + bob + 2);
+    ctx.fillText('CHROMA KNIGHT', W * 0.5 + 4, 172 + bob + 4);
     ctx.fillStyle = game.phase === PHASE.LUNAR ? '#6ef3ff' : '#ffd561';
-    ctx.fillText('CHROMA KNIGHT', GAME_WIDTH * 0.5, 86 + bob);
+    ctx.fillText('CHROMA KNIGHT', W * 0.5, 172 + bob);
 
-    ctx.font = 'bold 11px monospace';
-    ctx.fillStyle = '#e8f0ff';
-    ctx.fillText('— 稜 鏡 騎 士：雙 相 冒 險 —', GAME_WIDTH * 0.5, 106 + bob);
+    ctx.font = `700 22px ${UI_FONT}`;
+    ctx.fillStyle = '#edf3ff';
+    ctx.fillText('— 稜 鏡 騎 士 ： 雙 相 冒 險 —', W * 0.5, 214 + bob);
 
     // Feature badges
-    ctx.font = '8px monospace';
-    ctx.fillStyle = '#b9c8eb';
-    ctx.fillText('熾陽 / 星月即時相位切換  •  8向衝刺  •  蹬牆跳  •  空中重擊  •  稜鏡巨像 BOSS', GAME_WIDTH * 0.5, 134);
+    ctx.font = `600 15px ${UI_FONT}`;
+    ctx.fillStyle = '#c4d3f5';
+    ctx.fillText('熾陽 / 星月即時相位切換  •  8向衝刺  •  蹬牆跳  •  空中重擊  •  稜鏡巨像 BOSS', W * 0.5, 268);
 
     // Animated Start prompt
     const pulse = 0.65 + 0.35 * Math.sin(time * 5);
     ctx.fillStyle = `rgba(255, 240, 160, ${pulse.toFixed(2)})`;
-    ctx.font = 'bold 11px monospace';
-    ctx.fillText('按 [ENTER] 或 [SPACE] 開始冒險', GAME_WIDTH * 0.5, 174);
+    ctx.font = `700 22px ${UI_FONT}`;
+    ctx.fillText('按 [ENTER] 或 [SPACE] 開始冒險', W * 0.5, 348);
 
-    ctx.font = '8px monospace';
-    ctx.fillStyle = '#8fa3cf';
-    ctx.fillText('快速選關：按 [1] 晨光遺跡  [2] 稜鏡峽谷  [3] 雙相聖殿 (BOSS)', GAME_WIDTH * 0.5, 198);
-    ctx.fillText('按 [Shift] 可即時預覽標題雙相光影切換！', GAME_WIDTH * 0.5, 214);
+    ctx.font = `500 15px ${UI_FONT}`;
+    ctx.fillStyle = '#9db2de';
+    ctx.fillText('快速選關：按 [1] 晨光遺跡   [2] 稜鏡峽谷   [3] 雙相聖殿 (BOSS)', W * 0.5, 396);
+    ctx.fillText('按 [Shift] 可即時預覽標題雙相光影切換！', W * 0.5, 428);
     ctx.textAlign = 'left';
   }
 
   _drawPauseOverlay(ctx) {
-    ctx.fillStyle = 'rgba(6, 8, 18, 0.68)';
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    const W = 960;
+    const H = 540;
+    const UI_FONT = '"Noto Sans TC", "Microsoft JhengHei", ui-monospace, sans-serif';
+    ctx.fillStyle = 'rgba(6, 8, 18, 0.72)';
+    ctx.fillRect(0, 0, W, H);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 18px monospace';
-    ctx.fillText('PAUSED 暫停中', GAME_WIDTH * 0.5, 122);
-    ctx.font = '9px monospace';
+    ctx.font = `800 36px ${UI_FONT}`;
+    ctx.fillText('PAUSED 暫停中', W * 0.5, 244);
+    ctx.font = `600 17px ${UI_FONT}`;
     ctx.fillStyle = '#b9c8eb';
-    ctx.fillText('[ESC / P] 繼續遊戲    [R] 重玩本關    [1/2/3] 切換關卡', GAME_WIDTH * 0.5, 148);
+    ctx.fillText('[ESC / P] 繼續遊戲    [R] 重玩本關    [1 / 2 / 3] 切換關卡', W * 0.5, 296);
     ctx.textAlign = 'left';
   }
 
   _drawStageClear(ctx, game) {
-    ctx.fillStyle = 'rgba(6, 10, 22, 0.76)';
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    const W = 960;
+    const H = 540;
+    const UI_FONT = '"Noto Sans TC", "Microsoft JhengHei", ui-monospace, sans-serif';
+    ctx.fillStyle = 'rgba(6, 10, 22, 0.78)';
+    ctx.fillRect(0, 0, W, H);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffe066';
-    ctx.font = 'bold 20px monospace';
-    ctx.fillText('STAGE CLEAR!', GAME_WIDTH * 0.5, 88);
+    ctx.font = '900 42px ui-monospace, monospace';
+    ctx.fillText('STAGE CLEAR!', W * 0.5, 176);
 
     const rank = game.score >= 2200 ? 'S' : game.score >= 1200 ? 'A' : 'B';
     ctx.fillStyle = '#ffffff';
-    ctx.font = '10px monospace';
-    ctx.fillText(`通關時間：${game.stageTime.toFixed(2)}s    金幣：${game.coins}    分數：${game.score}`, GAME_WIDTH * 0.5, 122);
+    ctx.font = `600 20px ${UI_FONT}`;
+    ctx.fillText(`通關時間：${game.stageTime.toFixed(2)}s    金幣：${game.coins}    分數：${game.score}`, W * 0.5, 244);
     ctx.fillStyle = rank === 'S' ? '#4af7c8' : '#ffd561';
-    ctx.font = 'bold 16px monospace';
-    ctx.fillText(`評價 RANK ${rank}`, GAME_WIDTH * 0.5, 152);
+    ctx.font = `800 34px ${UI_FONT}`;
+    ctx.fillText(`評價 RANK ${rank}`, W * 0.5, 308);
 
-    ctx.fillStyle = '#b9c8eb';
-    ctx.font = '9px monospace';
-    ctx.fillText('按 [ENTER] 或 [SPACE] 進入下一關', GAME_WIDTH * 0.5, 188);
+    ctx.fillStyle = '#c4d3f5';
+    ctx.font = `600 18px ${UI_FONT}`;
+    ctx.fillText('按 [ENTER] 或 [SPACE] 進入下一關', W * 0.5, 376);
     ctx.textAlign = 'left';
   }
 
   _drawVictory(ctx, game, time) {
-    ctx.fillStyle = 'rgba(8, 10, 24, 0.8)';
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    const W = 960;
+    const H = 540;
+    const UI_FONT = '"Noto Sans TC", "Microsoft JhengHei", ui-monospace, sans-serif';
+    ctx.fillStyle = 'rgba(8, 10, 24, 0.82)';
+    ctx.fillRect(0, 0, W, H);
     ctx.textAlign = 'center';
     ctx.fillStyle = Math.floor(time * 6) % 2 === 0 ? '#ffe066' : '#6ef3ff';
-    ctx.font = 'bold 22px monospace';
-    ctx.fillText('ALL STAGES CLEARED!', GAME_WIDTH * 0.5, 86);
+    ctx.font = '900 44px ui-monospace, monospace';
+    ctx.fillText('ALL STAGES CLEARED!', W * 0.5, 172);
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 11px monospace';
-    ctx.fillText('你征服了雙相聖殿並擊敗了稜鏡巨像！', GAME_WIDTH * 0.5, 114);
-    ctx.font = '10px monospace';
+    ctx.font = `700 22px ${UI_FONT}`;
+    ctx.fillText('你征服了雙相聖殿並擊敗了稜鏡巨像！', W * 0.5, 228);
+    ctx.font = `600 20px ${UI_FONT}`;
     ctx.fillStyle = '#d4e2ff';
-    ctx.fillText(`最終總分：${game.score}    收集金幣：${game.coins}`, GAME_WIDTH * 0.5, 144);
+    ctx.fillText(`最終總分：${game.score}    收集金幣：${game.coins}`, W * 0.5, 288);
     ctx.fillStyle = '#8effe0';
-    ctx.font = '9px monospace';
-    ctx.fillText('按 [ENTER] 或 [SPACE] 返回主畫面再戰速通！', GAME_WIDTH * 0.5, 184);
+    ctx.font = `600 18px ${UI_FONT}`;
+    ctx.fillText('按 [ENTER] 或 [SPACE] 返回主畫面再戰速通！', W * 0.5, 368);
     ctx.textAlign = 'left';
   }
 
   _drawGameOver(ctx, game) {
-    ctx.fillStyle = 'rgba(18, 6, 12, 0.78)';
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    const W = 960;
+    const H = 540;
+    const UI_FONT = '"Noto Sans TC", "Microsoft JhengHei", ui-monospace, sans-serif';
+    ctx.fillStyle = 'rgba(18, 6, 12, 0.8)';
+    ctx.fillRect(0, 0, W, H);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ff5978';
-    ctx.font = 'bold 20px monospace';
-    ctx.fillText('FALLEN IN THE CHASM', GAME_WIDTH * 0.5, 110);
+    ctx.font = '900 40px ui-monospace, monospace';
+    ctx.fillText('FALLEN IN THE CHASM', W * 0.5, 220);
     ctx.fillStyle = '#e8ecf8';
-    ctx.font = '10px monospace';
-    ctx.fillText(`目前分數：${game.score}`, GAME_WIDTH * 0.5, 138);
+    ctx.font = `600 20px ${UI_FONT}`;
+    ctx.fillText(`目前分數：${game.score}`, W * 0.5, 276);
     ctx.fillStyle = '#ffe066';
-    ctx.font = '9px monospace';
-    ctx.fillText('按 [SPACE / R] 從檢查點立即重生    [ESC] 回標題', GAME_WIDTH * 0.5, 168);
+    ctx.font = `600 18px ${UI_FONT}`;
+    ctx.fillText('按 [SPACE / R] 從檢查點立即重生    [ESC] 回標題', W * 0.5, 336);
     ctx.textAlign = 'left';
   }
 }
