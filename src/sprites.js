@@ -76,6 +76,7 @@ export function createSpriteAtlas() {
   atlas.tiles.solarGhost = bakePhaseTile('#ffb638', '#ff7b1c', '#fff3a8', '#8a3509', false);
   atlas.tiles.lunarSolid = bakePhaseTile('#3ee0ff', '#2782e6', '#d8fcff', '#103875', true);
   atlas.tiles.lunarGhost = bakePhaseTile('#3ee0ff', '#2782e6', '#d8fcff', '#103875', false);
+  atlas.tiles.ice = bakeIceTile();
 
   // --- PLAYER SPRITES (16x18) ---
   const playerIdle = [
@@ -606,5 +607,22 @@ function bakePhaseTile(main, mid, hi, dark, solid) {
     ctx.fillRect(7, 6, 2, 4);
     ctx.fillRect(6, 7, 4, 2);
   }
+  return c;
+}
+
+function bakeIceTile() {
+  const c = makeCanvas(16, 16);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#295b8c';
+  ctx.fillRect(0, 0, 16, 16);
+  ctx.fillStyle = '#73d4ff';
+  ctx.fillRect(1, 1, 14, 14);
+  ctx.fillStyle = '#c4f5ff';
+  ctx.fillRect(1, 1, 14, 3);
+  ctx.fillRect(2, 5, 4, 2);
+  ctx.fillRect(9, 8, 5, 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(2, 1, 5, 1);
+  ctx.fillRect(10, 2, 3, 1);
   return c;
 }

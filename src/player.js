@@ -16,6 +16,7 @@ export class Player {
     this.vy = 0;
     this.facing = 1;
     this.onGround = false;
+    this.onIce = false;
     this.wallDir = 0; // -1 left wall, 1 right wall
     this.coyoteTimer = 0;
     this.wallCoyoteTimer = 0;
@@ -181,10 +182,10 @@ export class Player {
       }
     } else if (!this.groundPounding) {
       // --- HORIZONTAL MOVEMENT ---
-      const accel = this.onGround ? PHYSICS.GROUND_ACCEL : PHYSICS.AIR_ACCEL;
-      const decel = this.onGround ? PHYSICS.GROUND_DECEL : PHYSICS.AIR_DECEL;
+      const accel = this.onGround ? (this.onIce ? PHYSICS.GROUND_ACCEL * 0.24 : PHYSICS.GROUND_ACCEL) : PHYSICS.AIR_ACCEL;
+      const decel = this.onGround ? (this.onIce ? PHYSICS.GROUND_DECEL * 0.12 : PHYSICS.GROUND_DECEL) : PHYSICS.AIR_DECEL;
       if (moveX !== 0) {
-        const target = moveX * PHYSICS.RUN_SPEED;
+        const target = moveX * (this.onIce ? PHYSICS.RUN_SPEED * 1.18 : PHYSICS.RUN_SPEED);
         if (this.vx < target) this.vx = Math.min(target, this.vx + accel * dt);
         else if (this.vx > target) this.vx = Math.max(target, this.vx - accel * dt);
       } else {
@@ -261,6 +262,7 @@ export class Player {
     const prevBottom = this.y + this.h;
     this.y += this.vy * dt;
     this.onGround = false;
+    this.onIce = false;
     this._resolveY(level, phase, prevBottom, game);
 
     // Moving platforms collision (one-way top)
@@ -410,8 +412,11 @@ export class Player {
           this.y = botTy * TILE_SIZE - this.h;
           this.vy = 0;
           this.onGround = true;
-          if (level.getTile(tx, botTy) === TILE.CRUMBLE) {
+          const ft = level.getTile(tx, botTy);
+          if (ft === TILE.CRUMBLE) {
             level.triggerCrumble(tx, botTy);
+          } else if (ft === TILE.ICE) {
+            this.onIce = true;
           }
           break;
         }

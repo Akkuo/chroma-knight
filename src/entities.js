@@ -176,6 +176,92 @@ export class MovingPlatform {
   }
 }
 
+export class UpdraftColumn {
+  constructor(x, y, h = 112) {
+    this.x = x;
+    this.y = y - h + 16;
+    this.w = 24;
+    this.h = h;
+  }
+
+  update(dt, player, game) {
+    if (overlaps(this, player)) {
+      const lift = game.input.jump ? -1380 : -1060;
+      player.vy = Math.max(-210, player.vy + lift * dt);
+      player.canDash = true;
+      if (Math.random() < 0.35) {
+        game.particles.burst(
+          this.x + Math.random() * this.w,
+          this.y + this.h - 4,
+          1,
+          game.phase === PHASE.LUNAR ? '#9ef6ff' : '#fff2c4',
+          { speedMin: 40, speedMax: 90, angleOffset: -Math.PI * 0.5, spread: 0.25, gravity: -80, lifeMax: 0.4 }
+        );
+      }
+    }
+  }
+}
+
+export class Firebar {
+  constructor(x, y, count = 4, speed = 2.0) {
+    this.cx = x + 8;
+    this.cy = y + 8;
+    this.count = count;
+    this.speed = speed;
+    this.angle = Math.random() * Math.PI * 2;
+  }
+
+  update(dt, player, game) {
+    this.angle += this.speed * dt;
+    for (let i = 1; i <= this.count; i++) {
+      const fx = this.cx + Math.cos(this.angle) * (i * 11);
+      const fy = this.cy + Math.sin(this.angle) * (i * 11);
+      const box = { x: fx - 3, y: fy - 3, w: 6, h: 6 };
+      if (overlaps(box, player)) {
+        player.hurt(game, player.cx < fx ? -1 : 1);
+        return;
+      }
+    }
+  }
+}
+
+export class BoostRing {
+  constructor(x, y, dirX = 1, dirY = -0.35) {
+    this.x = x;
+    this.y = y;
+    this.w = 18;
+    this.h = 18;
+    const len = Math.hypot(dirX, dirY) || 1;
+    this.dirX = dirX / len;
+    this.dirY = dirY / len;
+    this.cooldown = 0;
+  }
+
+  update(dt, player, game) {
+    if (this.cooldown > 0) {
+      this.cooldown -= dt;
+      return;
+    }
+    if (overlaps(this, player)) {
+      this.cooldown = 0.45;
+      player.groundPounding = false;
+      player.dashTimer = 0;
+      player.vx = this.dirX * 330;
+      player.vy = this.dirY * 330;
+      player.canDash = true;
+      player.onGround = false;
+      player.setSquash(1.38, 0.72);
+      game.sound.playSpring();
+      game.hitstop = 0.03;
+      game.addShake(4);
+      const col = game.phase === PHASE.LUNAR ? '#4ae3ff' : '#ffd54f';
+      game.particles.burst(this.x + 9, this.y + 9, 16, col, { speedMax: 150, gravity: 0, glow: true });
+      game.particles.spawnRipple(this.x + 9, this.y + 9, col, 48);
+      game.particles.spawnText(this.x + 9, this.y - 4, 'BOOST!', '#fff3a8');
+    }
+  }
+}
+
 class BaseEnemy {
   constructor(x, y, w, h) {
     this.x = x;

@@ -64,10 +64,13 @@ export class Renderer {
       this._drawInteractiveGrass(ctx, particles.grass, pal.grass);
     }
 
-    // 3. Entities (Platforms, Springs, Checkpoints, Coins, Crystals, Enemies, Boss)
+    // 3. Entities (Updrafts, Platforms, Springs, BoostRings, Firebars, Checkpoints, Coins, Crystals, Enemies, Boss)
     if (level) {
+      this._drawUpdrafts(ctx, game.updrafts, phase, time);
       this._drawPlatforms(ctx, game.platforms, phase);
       this._drawSprings(ctx, game.springs);
+      this._drawBoostRings(ctx, game.boostRings, phase, time);
+      this._drawFirebars(ctx, game.firebars, time);
       this._drawCheckpoints(ctx, game.checkpoints, time, phase);
       this._drawPickups(ctx, game.coinsList, game.hearts, game.dashCrystals, time);
       this._drawEnemies(ctx, game.enemies, phase, time);
@@ -361,6 +364,9 @@ export class Renderer {
           case TILE.DIRT:
             ctx.drawImage(isLunar ? bt.dirtLunar : bt.dirtSolar, px, py);
             break;
+          case TILE.ICE:
+            ctx.drawImage(t.ice, px, py);
+            break;
           case TILE.BRICK:
             ctx.drawImage(t.brick, px, py);
             break;
@@ -461,6 +467,70 @@ export class Renderer {
       ctx.lineTo(tipX, tipY);
     }
     ctx.stroke();
+  }
+
+  _drawUpdrafts(ctx, updrafts, phase, time) {
+    if (!updrafts || !updrafts.length) return;
+    const col = phase === PHASE.LUNAR ? 'rgba(120, 245, 255, 0.22)' : 'rgba(255, 242, 185, 0.22)';
+    const streak = phase === PHASE.LUNAR ? 'rgba(180, 252, 255, 0.55)' : 'rgba(255, 252, 215, 0.55)';
+    for (const u of updrafts) {
+      ctx.fillStyle = col;
+      ctx.fillRect(u.x, u.y, u.w, u.h);
+      ctx.fillStyle = streak;
+      for (let i = 0; i < 5; i++) {
+        const sx = u.x + 3 + i * 4.5;
+        const sy = u.y + u.h - (((time * 120 + i * 27) % u.h));
+        ctx.fillRect(Math.round(sx), Math.round(sy), 1.5, 10);
+      }
+    }
+  }
+
+  _drawBoostRings(ctx, rings, phase, time) {
+    if (!rings || !rings.length) return;
+    const col = phase === PHASE.LUNAR ? '#4ae3ff' : '#ffd54f';
+    for (const r of rings) {
+      const cx = r.x + 9;
+      const cy = r.y + 9;
+      const pulse = 8 + Math.sin(time * 8) * 1.4;
+      ctx.save();
+      ctx.globalAlpha = r.cooldown > 0 ? 0.35 : 0.95;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      // Direction chevron inside ring
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(cx + r.dirX * 5, cy + r.dirY * 5);
+      ctx.lineTo(cx - r.dirY * 3 - r.dirX * 2, cy + r.dirX * 3 - r.dirY * 2);
+      ctx.lineTo(cx + r.dirY * 3 - r.dirX * 2, cy - r.dirX * 3 - r.dirY * 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  _drawFirebars(ctx, firebars, time) {
+    if (!firebars || !firebars.length) return;
+    for (const fb of firebars) {
+      // Anchor hub
+      ctx.fillStyle = '#292230';
+      ctx.fillRect(Math.round(fb.cx - 4), Math.round(fb.cy - 4), 8, 8);
+      ctx.fillStyle = '#ff9838';
+      ctx.fillRect(Math.round(fb.cx - 2), Math.round(fb.cy - 2), 4, 4);
+      // Orbiting fireballs
+      for (let i = 1; i <= fb.count; i++) {
+        const fx = fb.cx + Math.cos(fb.angle) * (i * 11);
+        const fy = fb.cy + Math.sin(fb.angle) * (i * 11);
+        ctx.fillStyle = '#ff4229';
+        ctx.beginPath();
+        ctx.arc(fx, fy, 4 + Math.sin(time * 18 + i) * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff399';
+        ctx.fillRect(Math.round(fx - 1.5), Math.round(fy - 1.5), 3, 3);
+      }
+    }
   }
 
   _drawPlatforms(ctx, platforms, phase) {

@@ -34,6 +34,7 @@ export const TILE = {
   LAVA: 14,        // Glowing hazard lava/abyss
   BOUNCE_PAD: 15,  // Embedded spring tile
   GOAL_GATE: 16,   // Stage exit portal
+  ICE: 17,         // Low-friction slippery ice block
 };
 
 export const PHYSICS = {

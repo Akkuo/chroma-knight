@@ -337,6 +337,7 @@ const TILE = {
   LAVA: 14,        // Glowing hazard lava/abyss
   BOUNCE_PAD: 15,  // Embedded spring tile
   GOAL_GATE: 16,   // Stage exit portal
+  ICE: 17,         // Low-friction slippery ice block
 };
 const PHYSICS = {
   GRAVITY: 960,
@@ -861,6 +862,7 @@ function createSpriteAtlas() {
   atlas.tiles.solarGhost = bakePhaseTile('#ffb638', '#ff7b1c', '#fff3a8', '#8a3509', false);
   atlas.tiles.lunarSolid = bakePhaseTile('#3ee0ff', '#2782e6', '#d8fcff', '#103875', true);
   atlas.tiles.lunarGhost = bakePhaseTile('#3ee0ff', '#2782e6', '#d8fcff', '#103875', false);
+  atlas.tiles.ice = bakeIceTile();
 
   // --- PLAYER SPRITES (16x18) ---
   const playerIdle = [
@@ -1394,6 +1396,23 @@ function bakePhaseTile(main, mid, hi, dark, solid) {
   return c;
 }
 
+function bakeIceTile() {
+  const c = makeCanvas(16, 16);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#295b8c';
+  ctx.fillRect(0, 0, 16, 16);
+  ctx.fillStyle = '#73d4ff';
+  ctx.fillRect(1, 1, 14, 14);
+  ctx.fillStyle = '#c4f5ff';
+  ctx.fillRect(1, 1, 14, 3);
+  ctx.fillRect(2, 5, 4, 2);
+  ctx.fillRect(9, 8, 5, 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(2, 1, 5, 1);
+  ctx.fillRect(10, 2, 3, 1);
+  return c;
+}
+
 // === src/particles.js ===
 // Particles, shatter debris, floating combat/score text, phase ripples, and interactive grass
 class ParticleSystem {
@@ -1896,11 +1915,15 @@ const EDITOR_PALETTE = [
   { id: 'tile:8', label: '尖刺', kind: 'tile', tile: TILE.SPIKE, color: '#ff5978' },
   { id: 'tile:12', label: '水面', kind: 'tile', tile: TILE.WATER, color: '#38c7e0' },
   { id: 'tile:14', label: '岩漿', kind: 'tile', tile: TILE.LAVA, color: '#ff5238' },
+  { id: 'tile:17', label: '冰塊', kind: 'tile', tile: TILE.ICE, color: '#8ae8ff' },
   { id: 'tile:13', label: '石柱', kind: 'tile', tile: TILE.PILLAR, color: '#6b7299' },
   { id: 'tile:0', label: '橡皮擦', kind: 'tile', tile: TILE.EMPTY, color: '#33384d' },
   { id: 'ent:coin', label: '金幣', kind: 'entity', ent: 'coin', color: '#ffe169' },
   { id: 'ent:dash_crystal', label: '衝刺晶', kind: 'entity', ent: 'dash_crystal', color: '#4af7c8' },
   { id: 'ent:spring', label: '彈簧', kind: 'entity', ent: 'spring', color: '#ff6b7a' },
+  { id: 'ent:boost_ring', label: '彈射環', kind: 'entity', ent: 'boost_ring', color: '#ffe066' },
+  { id: 'ent:updraft', label: '氣流柱', kind: 'entity', ent: 'updraft', color: '#b5f6ff' },
+  { id: 'ent:firebar', label: '火球鏈', kind: 'entity', ent: 'firebar', color: '#ff6a2e' },
   { id: 'ent:checkpoint', label: '存檔燈', kind: 'entity', ent: 'checkpoint', color: '#ffd966' },
   { id: 'ent:slime', label: '史萊姆', kind: 'entity', ent: 'slime', color: '#58e076' },
   { id: 'ent:beetle', label: '甲殼蟲', kind: 'entity', ent: 'beetle', color: '#e0485e' },
@@ -2110,6 +2133,9 @@ class LevelEditor {
       if (sel.ent === 'coin') spawn = { type: 'coin', x: px + 3, y: py + 3 };
       else if (sel.ent === 'dash_crystal') spawn = { type: 'dash_crystal', x: px + 2, y: py + 2 };
       else if (sel.ent === 'spring') spawn = { type: 'spring', x: px, y: py };
+      else if (sel.ent === 'boost_ring') spawn = { type: 'boost_ring', x: px - 1, y: py - 1, dirX: 1, dirY: -0.38 };
+      else if (sel.ent === 'updraft') spawn = { type: 'updraft', x: px - 4, y: py + 16, h: 128 };
+      else if (sel.ent === 'firebar') spawn = { type: 'firebar', x: px, y: py, count: 4, speed: 2.0 };
       else if (sel.ent === 'checkpoint') spawn = { type: 'checkpoint', x: px, y: py - 8 };
       else if (sel.ent === 'slime') spawn = { type: 'slime', x: px, y: py + 2 };
       else if (sel.ent === 'beetle') spawn = { type: 'beetle', x: px, y: py + 2 };
@@ -2193,15 +2219,16 @@ class LevelEditor {
 /*
   ASCII Map Legend:
   . = Empty
-  # = Ground (grass top)
+  # = Ground (biome-themed top)
   d = Dirt / Stone fill
+  I = Slippery Ice Block
   B = Breakable Brick
   ? = Question Block (coins / powerup)
   S = Solar Phase Block (solid in SOLAR)
   L = Lunar Phase Block (solid in LUNAR)
   ^ = Spikes
   X = Cracked Stone (shatter via Ground Pound or Shell)
-  - = One-way wooden bridge
+  - = One-way wooden/steel catwalk
   C = Crumbling platform
   ~ = Water pool (with real-time reflection)
   ! = Glowing lava hazard
@@ -2219,9 +2246,13 @@ class LevelEditor {
   w = Solar Wisp
   v = Lunar Wisp
   H = Heart Pickup
+  W = Updraft Wind Column (lifts player skyward!)
+  F = Rotating Firebar Hazard (spinning flame chain!)
+  O = Boost Ring (blasts player forward/upward!)
   @ = Boss Spawn (Prism Golem)
 */
 
+// STAGE 1: Classic Rolling Hills & Secret Upper Roofs (Ruins)
 const STAGE_1_MAP = [
   '....................................................................................................',
   '....................................................................................................',
@@ -2242,104 +2273,109 @@ const STAGE_1_MAP = [
   'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
 ];
 
+// STAGE 2: Floating Sky-Island Chasm & Boost-Ring Aerial Highway (Chasm)
 const STAGE_2_MAP = [
   '..............................................................................................................',
   '..............................................................................................................',
-  '..............................................................................................................',
-  '.....................................................c.c.c....................................................',
-  '....................................................-------...................................................',
-  '.............................................................................c.c.c............................',
-  '.......................................c.c.................................#.......#..........................',
-  '......................................SSSSS...........D....................#...c...#..........................',
-  '...........................c.c.............................................#..LLL..#...........c.c.c..........',
-  '..........................LLLLL..............c.c...........c.c.............#.......#..........SSSSSSS.........',
-  '..............c.c...........................CCCCC.........SSSSS............#..SSS..#..........................',
-  '............B?B?B.....D.............U......................................#...D...#....D.....................',
-  '.....P...c..........c...e..........###.............t..K....w....v.....U....#.......#........t.....e.......G...',
-  '##########....SSSS....######..LLL..###....LLLL....######........####..###..#..SSS..#..LLLL..#########..#######',
-  'dddddddddd!!!!....!!!!dddddd!!...!!ddd!!!!....!!!!dddddd!!!!!!!!dddd!!ddd!!d!!...!!d!!....!!ddddddddd!!ddddddd',
-  'dddddddddd!!!!!!!!!!!!dddddd!!!!!!!ddd!!!!!!!!!!!!dddddd!!!!!!!!dddd!!ddd!!d!!!!!!!d!!!!!!!!ddddddddd!!ddddddd',
-  'dddddddddd!!!!!!!!!!!!dddddd!!!!!!!ddd!!!!!!!!!!!!dddddd!!!!!!!!dddd!!ddd!!d!!!!!!!d!!!!!!!!ddddddddd!!ddddddd',
+  '............................................................c.c.c.............................................',
+  '...........................................................#######............................................',
+  '........................................c.c.c.......................................c.c.c.....................',
+  '.......................c.c.............LLLLLLL..............c...c..................SSSSSSS....................',
+  '......................SSSSS.......................O.............................................O.............',
+  '....................................O....................................c.c..................................',
+  '..............c.c..................................####..............#########..............c.c...............',
+  '.............#####..................................dd.....................................LLLLL..............',
+  '......c...................................................c.c..K..c...................................c.c.....',
+  '.....P.....O.............D.......W............D..........###########..........W...........D...............G...',
+  '#########...............###.............###..............ddddddddddd..........###...................##########',
+  'ddddddddd...............ddd.............ddd...................................ddd...................dddddddddd',
+  'ddddddddd!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!dddddddddd',
+  'ddddddddd!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!dddddddddd',
+  'ddddddddd!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!dddddddddd',
 ];
 
+// STAGE 3: Two-Tier Branching Aqueduct — Upper Sky Canal vs Lower Flooded Ice & Shell Alley (Aqueduct)
 const STAGE_3_MAP = [
   '....................................................................................................................',
   '....................................................................................................................',
+  '..................................c.c.c............................c.c.c............................................',
+  '.................................B?B?B?B..........................-------.......................c.c.c...............',
+  '......................c.c.............................................................O........B?B?B?B..............',
+  '.....................-----...............O.........SSSSSS..................LLLLLL...................................',
   '....................................................................................................................',
-  '..........................................c.c.c.c...................................................................',
-  '.........................................---------....................................c.c.c.........................',
-  '......................c.c.c..........................................................B?B?B?B........................',
-  '.....................B?B?B......................................c.c.................................................',
-  '...............................................................LLLLL................................................',
-  '....................................c.c.c.........................................c.c.c..........c.c.c..............',
-  '.............c.c...................SSSSSSS..............D........................SSSSSSS........LLLLLLL.............',
-  '............-----...............................................w.......v...........................................',
-  '.........................U......................c.c.......................................U.........................',
-  '.....P.....c.....t......###..c.c..........t....XXXXX....K....|.....e.....|....t....e.....###.....c...c.........G....',
-  '##########....######....###..----..#############...########..#############..###########..###...#########....########',
-  'dddddddddd~~~~dddddd~~~~ddd~~~~~~~~ddddddddddddd~~~dddddddd~~ddddddddddddd~~ddddddddddd~~ddd~~~ddddddddd~~~~dddddddd',
-  'dddddddddd~~~~dddddd~~~~ddd~~~~~~~~ddddddddddddd~~~dddddddd~~ddddddddddddd~~ddddddddddd~~ddd~~~ddddddddd~~~~dddddddd',
+  '.............c.c..................c.c............................................c.c................................',
+  '............LLLLL................#####..........c.c........c.c..........c.c.....#####............c.c................',
+  '..................................ddd..........-----......-----........-----.....ddd............SSSSS...............',
+  '...................U.........................................................................U......................',
+  '..................###.............................................K.........................###.....................',
+  '.....P.....c..t...###..c.c..XXXXX..e....t...XXXXX...e.....t...#########..c...c..t...XXXXX...###.....c....c......G...',
+  '##########..IIII..###..IIIIIIIIII..#########.....########....###########..IIIIII...#######..###...########..########',
+  'dddddddddd~~dddd~~ddd~~dddddddddd~~ddddddddd~~~~~dddddddd~~~~ddddddddddd~~dddddd~~~ddddddd~~ddd~~~dddddddd~~dddddddd',
+  'dddddddddd~~dddd~~ddd~~dddddddddd~~ddddddddd~~~~~dddddddd~~~~ddddddddddd~~dddddd~~~ddddddd~~ddd~~~dddddddd~~dddddddd',
   'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
 ];
 
+// STAGE 4: Multi-Deck Lava Factory with Rotating Firebars & Catwalk Elevators (Foundry)
 const STAGE_4_MAP = [
   '........................................................................................................................',
   '........................................................................................................................',
-  '........................................................................................................................',
-  '....................................................................c.c.c...............................................',
-  '...................................................................-------..............................................',
-  '........................................c.c.c........................................................c.c.c..............',
-  '.......................................B?B?B........................................................B?B?B...............',
-  '........................................................c.c.............................................................',
-  '...................c.c.................................SSSSS................c.c..........c.c............................',
-  '..................SSSSS......D...........c.c.......................D.......CCCCC........LLLLL......D....................',
-  '........................................CCCCC...........................................................................',
-  '..........c.c......................................U......................................................U.............',
-  '.....P...LLLLL.....e.....t.......w......c...c.....###.....K....v.....t.....XXXXX....H.....e.....w........###........G...',
-  '#########.....#############.....####....#####.....###..########....#####...#####..#####..######....LLLL..###..##########',
-  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!!!ddddd!!!!!ddd!!dddddddd!!!!ddddd!!!ddddd!!ddddd!!dddddd!!!!....!!ddd!!dddddddddd',
-  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!!!ddddd!!!!!ddd!!dddddddd!!!!ddddd!!!ddddd!!ddddd!!dddddd!!!!!!!!!!ddd!!dddddddddd',
-  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!!!ddddd!!!!!ddd!!dddddddd!!!!ddddd!!!ddddd!!ddddd!!dddddd!!!!!!!!!!ddd!!dddddddddd',
+  '.....................................................................................c.c.c..............................',
+  '....................................................................................#######.............................',
+  '.....................................c.c.c..............................................................................',
+  '....................................-------.............c.c......................................c.c....................',
+  '...................c.c.................................#####..........F.........................SSSSS......O............',
+  '..................#####..........F......................ddd.............................................................',
+  '...................ddd.........................................................c.c......................................',
+  '...........c.c..........................c.c...................................CCCCC.......D...........c.c...............',
+  '..........CCCCC..............O.........SSSSS......D...............K..................................LLLLL..............',
+  '...............................................................#######...........F......................................',
+  '.....P..........F.......t.........w.............XXXXX....H.....ddddddd.....t.............e.....U.................G......',
+  '#########.....#####...#####.............#####...#####..#####.............#####.........#####..###..........#############',
+  'ddddddddd!!!!!ddddd!!!ddddd!!!!!!!!!!!!!ddddd!!!ddddd!!ddddd!!!!!!!!!!!!!ddddd!!!!!!!!!ddddd!!ddd!!!!!!!!!!ddddddddddddd',
+  'ddddddddd!!!!!ddddd!!!ddddd!!!!!!!!!!!!!ddddd!!!ddddd!!ddddd!!!!!!!!!!!!!ddddd!!!!!!!!!ddddd!!ddd!!!!!!!!!!ddddddddddddd',
+  'ddddddddd!!!!!ddddd!!!ddddd!!!!!!!!!!!!!ddddd!!!ddddd!!ddddd!!!!!!!!!!!!!ddddd!!!!!!!!!ddddd!!ddd!!!!!!!!!!ddddddddddddd',
 ];
 
+// STAGE 5: Zig-Zag Aurora Skyscraper — Vertical Chimneys, Ice Slopes & Updraft Glides (Spire)
 const STAGE_5_MAP = [
   '........................................................................................................................',
   '........................................................................................................................',
-  '........................................#........#......................................................................',
-  '........................................#..c..c..#.................................c.c.c................................',
-  '........................................#..LLLL..#................................-------...............................',
-  '......................c.c.c.............#........#...............................................#.......#..............',
-  '.....................-------............#..SSSS..#.............c.c...............................#..c.c..#..............',
-  '........................................#...D....#............LLLLL.........D....................#..SSS..#..............',
-  '.............c.c........................#........#....................................c.c........#.......#..............',
-  '............LLLLL.........D.............#..LLLL..#.....w................v............CCCCC.......#..LLL..#....D.........',
-  '........................................#........#...............................................#...D...#..............',
-  '.......................U................#..SSSS..#..........U....................................#.......#..............',
-  '.....P....c.....e.....###.....t.........#........#...K.....###....c...c.....t.....H.....e.....U..#.......#..........G...',
-  '#########...LLLL...######..######..SSS..#........#..#####..###..SSSS..LLLL..##########..####..##.#..SSS..#..LLL..#######',
-  'ddddddddd!!!....!!!dddddd!!dddddd!!...!!d!!!!!!!!d!!ddddd!!ddd!!....!!....!!dddddddddd!!dddd!!dd!d!!...!!d!!...!!ddddddd',
-  'ddddddddd!!!!!!!!!!dddddd!!dddddd!!!!!!!d!!!!!!!!d!!ddddd!!ddd!!!!!!!!!!!!!!dddddddddd!!dddd!!dd!d!!!!!!!d!!!!!!!ddddddd',
-  'ddddddddd!!!!!!!!!!dddddd!!dddddd!!!!!!!d!!!!!!!!d!!ddddd!!ddd!!!!!!!!!!!!!!dddddddddd!!dddd!!dd!d!!!!!!!d!!!!!!!ddddddd',
+  '...................................#.......#...................................................c.c.c....................',
+  '...................................#..c.c..#......................c.c.c.......................IIIIIII..........c.c......',
+  '...................................#..LLL..#.....................-------......................................#####.....',
+  '...................c.c.c...........#.......#.........................................#.......#.................ddd......',
+  '..................IIIIIII..........#..SSS..#...........O.............................#..c.c..#..........................',
+  '...................................#...D...#.........................................#..SSS..#.......O..................',
+  '............c.c....................#.......#.................c.c.....................#.......#..........................',
+  '...........#####...................#..LLL..#................CCCCC.........D..........#..LLL..#................c.c.......',
+  '............ddd....................#.......#.........................................#...D...#...............LLLLL......',
+  '........................W..........#..SSS..#.........K.......................W.......#.......#..........................',
+  '.....P..c.........e................#.......#.....#########.....t.....................#.......#....H...............G.....',
+  '#########..IIIII..####.............#..III..#.....ddddddddd..IIIIIII..................#..SSS..#..#####.........##########',
+  'ddddddddd!!ddddd!!dddd!!!!!!!!!!!!!d!!!!!!!d!!!!!ddddddddd!!ddddddd!!!!!!!!!!!!!!!!!!d!!!!!!!d!!ddddd!!!!!!!!!dddddddddd',
+  'ddddddddd!!!!!!!!!dddd!!!!!!!!!!!!!d!!!!!!!d!!!!!!!!!!!!!!!!ddddddd!!!!!!!!!!!!!!!!!!d!!!!!!!d!!ddddd!!!!!!!!!dddddddddd',
+  'ddddddddd!!!!!!!!!dddd!!!!!!!!!!!!!d!!!!!!!d!!!!!!!!!!!!!!!!ddddddd!!!!!!!!!!!!!!!!!!d!!!!!!!d!!ddddd!!!!!!!!!dddddddddd',
 ];
 
+// STAGE 6: Royal Cathedral Gauntlet (All 4 New Gimmicks Combined) -> Prism Golem Boss Arena (Sanctum)
 const STAGE_6_MAP = [
   '...............................................................................................................',
   '...............................................................................................................',
   '...............................................................................................................',
-  '...............................................................................................................',
   '............................................................................................|.............|....',
-  '............................................................................................|.............|....',
-  '............................................................................................|.............|....',
-  '...........................................c.c.c............................................|...c.....c...|....',
-  '..........................................B?B?B?B...........................................|..SSS...LLL..|....',
-  '...................c.c.............................................c.c......................|.............|....',
-  '..................SSSSS......D............LLLLLLL......D..........CCCCC.........H...........|......D......|....',
-  '..........c.c...............................................................................|.............|....',
-  '.....P...LLLLL....e....t.....w.............XXXXX.......v....U.......t.......K...............|......@......|..G.',
-  '#########.....#############.....####..###############.....#####...#####..###########........###################',
-  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!ddddddddddddddd!!!!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!ddddddddddddddddddd',
-  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!ddddddddddddddd!!!!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!ddddddddddddddddddd',
-  'ddddddddd!!!!!ddddddddddddd!!!!!dddd!!ddddddddddddddd!!!!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!ddddddddddddddddddd',
+  '.............................................c.c.c..........................................|.............|....',
+  '............................................#######.........................................|...c.....c...|....',
+  '......................c.c.......................................c.c.........................|..SSS...LLL..|....',
+  '.....................SSSSS..........O..........................LLLLL........................|.............|....',
+  '..................................................F.........................................|......D......|....',
+  '...........c.c...........................................................c.c................|.............|....',
+  '..........LLLLL..............D..................................D.......CCCCC.......H.......|.............|....',
+  '........................................W...................................................|.............|....',
+  '.....P..........F.......t........................XXXXX....v.............t.....K.............|......@......|..G.',
+  '#########.....#####...#####..........#######.....#####..#####...IIIII..###########..........###################',
+  'ddddddddd!!!!!ddddd!!!ddddd!!!!!!!!!!ddddddd!!!!!ddddd!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!!!ddddddddddddddddddd',
+  'ddddddddd!!!!!ddddd!!!ddddd!!!!!!!!!!ddddddd!!!!!ddddd!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!!!ddddddddddddddddddd',
+  'ddddddddd!!!!!ddddd!!!ddddd!!!!!!!!!!ddddddd!!!!!ddddd!!ddddd!!!ddddd!!ddddddddddd!!!!!!!!!!ddddddddddddddddddd',
 ];
 const STAGE_DEFS = [
   {
@@ -2359,7 +2395,7 @@ const STAGE_DEFS = [
     subtitle: 'Prism Chasm',
     startPhase: PHASE.LUNAR,
     map: STAGE_2_MAP,
-    hint: '紫晶峽谷！星月相位擁有低重力浮空，善用衝刺水晶與蹬牆跳穿越裂谷！',
+    hint: '浮空島與彈射光環！衝進發光環高速飛躍深淵，善用上升氣流登頂！',
     hasBoss: false,
   },
   {
@@ -2369,7 +2405,7 @@ const STAGE_DEFS = [
     subtitle: 'Emerald Aqueduct',
     startPhase: PHASE.SOLAR,
     map: STAGE_3_MAP,
-    hint: '雨幕瀑布水殿！踢出甲殼甲蟲撞飛敵人與裂石，彈簧直衝高空隱藏寶庫！',
+    hint: '上下雙層分支路線！下層冰道踢龜殼橫掃裂石，上層水橋直衝秘寶庫！',
     hasBoss: false,
   },
   {
@@ -2379,7 +2415,7 @@ const STAGE_DEFS = [
     subtitle: 'Solar Foundry',
     startPhase: PHASE.SOLAR,
     map: STAGE_4_MAP,
-    hint: '火山齒輪鍛爐！精準把握崩塌磚節奏與空中衝刺水晶連跳！',
+    hint: '高危岩漿工廠！閃避旋轉火球鏈，把握鋼骨天橋與升降梯節奏！',
     hasBoss: false,
   },
   {
@@ -2389,7 +2425,7 @@ const STAGE_DEFS = [
     subtitle: 'Lunar Spire',
     startPhase: PHASE.LUNAR,
     map: STAGE_5_MAP,
-    hint: '極光雪峰雙塔！在垂直井道中交替切換熾陽/星月相位並配合蹬牆跳登頂！',
+    hint: '極光雪峰攀升！冰面加速起跳 ＋ 上升氣流 ＋ 雙塔井道相位蹬牆跳！',
     hasBoss: false,
   },
   {
@@ -2399,7 +2435,7 @@ const STAGE_DEFS = [
     subtitle: 'Twin-Phase Sanctum',
     startPhase: PHASE.SOLAR,
     map: STAGE_6_MAP,
-    hint: '聖殿最終決戰：擊敗【稜鏡巨像】！踩踏頭頂核心或踢龜殼造成雙倍暴擊！',
+    hint: '終極試煉：融合彈射環、火球鏈、上升氣流與冰道，挑戰聖殿【稜鏡巨像】！',
     hasBoss: true,
   },
 ];
@@ -2421,7 +2457,7 @@ class Level {
 
     this.tiles = new Uint8Array(this.width * this.height);
     this.bumpOffsets = new Float32Array(this.width * this.height);
-    this.crumbleTimers = new Map(); // tileIndex -> { state: 'shaking'|'gone', timer }
+    this.crumbleTimers = new Map();
 
     this.spawn = { x: 48, y: 160 };
     this.goal = { x: (this.width - 4) * TILE_SIZE, y: 12 * TILE_SIZE };
@@ -2439,6 +2475,7 @@ class Level {
         switch (ch) {
           case '#': t = TILE.GROUND; break;
           case 'd': t = TILE.DIRT; break;
+          case 'I': t = TILE.ICE; break;
           case 'B': t = TILE.BRICK; break;
           case '?': t = TILE.QUESTION; break;
           case 'S': t = TILE.SOLAR_BLOCK; break;
@@ -2464,6 +2501,9 @@ class Level {
           case 'w': this.entitySpawns.push({ type: 'wisp', x: px, y: py, phase: PHASE.SOLAR }); break;
           case 'v': this.entitySpawns.push({ type: 'wisp', x: px, y: py, phase: PHASE.LUNAR }); break;
           case 'H': this.entitySpawns.push({ type: 'heart', x: px + 3, y: py + 3 }); break;
+          case 'W': this.entitySpawns.push({ type: 'updraft', x: px - 4, y: py + 16, h: 128 }); break;
+          case 'F': this.entitySpawns.push({ type: 'firebar', x: px, y: py, count: 4, speed: 2.0 }); break;
+          case 'O': this.entitySpawns.push({ type: 'boost_ring', x: px - 1, y: py - 1, dirX: 1, dirY: -0.38 }); break;
           case '@':
             this.bossArenaX = (x - 10) * TILE_SIZE;
             this.entitySpawns.push({ type: 'boss', x: px - 8, y: py - 16 });
@@ -2474,24 +2514,24 @@ class Level {
       }
     }
 
-    // Add moving platforms tailored to each stage
+    // Add moving platforms tailored to each stage's route
     if (this.id === 1) {
       this.entitySpawns.push({ type: 'platform', x: 28 * 16, y: 11 * 16, w: 48, rangeX: 56, rangeY: 0, speed: 1.5 });
     } else if (this.id === 2) {
-      this.entitySpawns.push({ type: 'platform', x: 16 * 16, y: 12 * 16, w: 48, rangeX: 48, rangeY: 0, speed: 1.7 });
-      this.entitySpawns.push({ type: 'platform', x: 56 * 16, y: 11 * 16, w: 48, rangeX: 0, rangeY: 42, speed: 1.6 });
+      this.entitySpawns.push({ type: 'platform', x: 26 * 16, y: 11 * 16, w: 48, rangeX: 44, rangeY: 0, speed: 1.6 });
+      this.entitySpawns.push({ type: 'platform', x: 84 * 16, y: 10 * 16, w: 48, rangeX: 46, rangeY: 0, speed: 1.7 });
     } else if (this.id === 3) {
-      this.entitySpawns.push({ type: 'platform', x: 27 * 16, y: 11 * 16, w: 48, rangeX: 52, rangeY: 0, speed: 1.5 });
-      this.entitySpawns.push({ type: 'platform', x: 74 * 16, y: 10 * 16, w: 48, rangeX: 0, rangeY: 38, speed: 1.7 });
+      this.entitySpawns.push({ type: 'platform', x: 46 * 16, y: 7 * 16, w: 48, rangeX: 56, rangeY: 0, speed: 1.5 });
     } else if (this.id === 4) {
-      this.entitySpawns.push({ type: 'platform', x: 28 * 16, y: 12 * 16, w: 44, rangeX: 54, rangeY: 0, speed: 1.9 });
-      this.entitySpawns.push({ type: 'platform', x: 63 * 16, y: 11 * 16, w: 44, rangeX: 46, rangeY: 0, speed: 2.0 });
-      this.entitySpawns.push({ type: 'platform', x: 96 * 16, y: 11 * 16, w: 44, rangeX: 0, rangeY: 44, speed: 1.8 });
+      this.entitySpawns.push({ type: 'platform', x: 32 * 16, y: 11 * 16, w: 44, rangeX: 48, rangeY: 0, speed: 1.8 });
+      this.entitySpawns.push({ type: 'platform', x: 64 * 16, y: 9 * 16, w: 44, rangeX: 0, rangeY: 42, speed: 1.9 });
+      this.entitySpawns.push({ type: 'platform', x: 96 * 16, y: 11 * 16, w: 44, rangeX: 46, rangeY: 0, speed: 1.9 });
     } else if (this.id === 5) {
-      this.entitySpawns.push({ type: 'platform', x: 43 * 16, y: 10 * 16, w: 40, rangeX: 0, rangeY: 54, speed: 1.8 });
-      this.entitySpawns.push({ type: 'platform', x: 76 * 16, y: 11 * 16, w: 44, rangeX: 46, rangeY: 0, speed: 1.9 });
+      this.entitySpawns.push({ type: 'platform', x: 22 * 16, y: 10 * 16, w: 44, rangeX: 0, rangeY: 48, speed: 1.7 });
+      this.entitySpawns.push({ type: 'platform', x: 98 * 16, y: 10 * 16, w: 44, rangeX: 44, rangeY: 0, speed: 1.8 });
     } else if (this.id === 6) {
-      this.entitySpawns.push({ type: 'platform', x: 70 * 16, y: 11 * 16, w: 48, rangeX: 48, rangeY: 0, speed: 1.9 });
+      this.entitySpawns.push({ type: 'platform', x: 28 * 16, y: 11 * 16, w: 44, rangeX: 42, rangeY: 0, speed: 1.9 });
+      this.entitySpawns.push({ type: 'platform', x: 76 * 16, y: 11 * 16, w: 48, rangeX: 42, rangeY: 0, speed: 1.9 });
     }
   }
 
@@ -2521,7 +2561,15 @@ class Level {
 
   isSolid(tx, ty, phase) {
     const t = this.getTile(tx, ty);
-    if (t === TILE.GROUND || t === TILE.DIRT || t === TILE.BRICK || t === TILE.QUESTION || t === TILE.USED || t === TILE.CRACKED) {
+    if (
+      t === TILE.GROUND ||
+      t === TILE.DIRT ||
+      t === TILE.ICE ||
+      t === TILE.BRICK ||
+      t === TILE.QUESTION ||
+      t === TILE.USED ||
+      t === TILE.CRACKED
+    ) {
       return true;
     }
     if (t === TILE.SOLAR_BLOCK) return phase === PHASE.SOLAR;
@@ -2580,6 +2628,7 @@ class Player {
     this.vy = 0;
     this.facing = 1;
     this.onGround = false;
+    this.onIce = false;
     this.wallDir = 0; // -1 left wall, 1 right wall
     this.coyoteTimer = 0;
     this.wallCoyoteTimer = 0;
@@ -2745,10 +2794,10 @@ class Player {
       }
     } else if (!this.groundPounding) {
       // --- HORIZONTAL MOVEMENT ---
-      const accel = this.onGround ? PHYSICS.GROUND_ACCEL : PHYSICS.AIR_ACCEL;
-      const decel = this.onGround ? PHYSICS.GROUND_DECEL : PHYSICS.AIR_DECEL;
+      const accel = this.onGround ? (this.onIce ? PHYSICS.GROUND_ACCEL * 0.24 : PHYSICS.GROUND_ACCEL) : PHYSICS.AIR_ACCEL;
+      const decel = this.onGround ? (this.onIce ? PHYSICS.GROUND_DECEL * 0.12 : PHYSICS.GROUND_DECEL) : PHYSICS.AIR_DECEL;
       if (moveX !== 0) {
-        const target = moveX * PHYSICS.RUN_SPEED;
+        const target = moveX * (this.onIce ? PHYSICS.RUN_SPEED * 1.18 : PHYSICS.RUN_SPEED);
         if (this.vx < target) this.vx = Math.min(target, this.vx + accel * dt);
         else if (this.vx > target) this.vx = Math.max(target, this.vx - accel * dt);
       } else {
@@ -2825,6 +2874,7 @@ class Player {
     const prevBottom = this.y + this.h;
     this.y += this.vy * dt;
     this.onGround = false;
+    this.onIce = false;
     this._resolveY(level, phase, prevBottom, game);
 
     // Moving platforms collision (one-way top)
@@ -2974,8 +3024,11 @@ class Player {
           this.y = botTy * TILE_SIZE - this.h;
           this.vy = 0;
           this.onGround = true;
-          if (level.getTile(tx, botTy) === TILE.CRUMBLE) {
+          const ft = level.getTile(tx, botTy);
+          if (ft === TILE.CRUMBLE) {
             level.triggerCrumble(tx, botTy);
+          } else if (ft === TILE.ICE) {
+            this.onIce = true;
           }
           break;
         }
@@ -3257,6 +3310,89 @@ class MovingPlatform {
     this.y = this.startY + Math.sin(this.t) * this.rangeY;
     this.dx = this.x - prevX;
     this.dy = this.y - prevY;
+  }
+}
+class UpdraftColumn {
+  constructor(x, y, h = 112) {
+    this.x = x;
+    this.y = y - h + 16;
+    this.w = 24;
+    this.h = h;
+  }
+
+  update(dt, player, game) {
+    if (overlaps(this, player)) {
+      const lift = game.input.jump ? -1380 : -1060;
+      player.vy = Math.max(-210, player.vy + lift * dt);
+      player.canDash = true;
+      if (Math.random() < 0.35) {
+        game.particles.burst(
+          this.x + Math.random() * this.w,
+          this.y + this.h - 4,
+          1,
+          game.phase === PHASE.LUNAR ? '#9ef6ff' : '#fff2c4',
+          { speedMin: 40, speedMax: 90, angleOffset: -Math.PI * 0.5, spread: 0.25, gravity: -80, lifeMax: 0.4 }
+        );
+      }
+    }
+  }
+}
+class Firebar {
+  constructor(x, y, count = 4, speed = 2.0) {
+    this.cx = x + 8;
+    this.cy = y + 8;
+    this.count = count;
+    this.speed = speed;
+    this.angle = Math.random() * Math.PI * 2;
+  }
+
+  update(dt, player, game) {
+    this.angle += this.speed * dt;
+    for (let i = 1; i <= this.count; i++) {
+      const fx = this.cx + Math.cos(this.angle) * (i * 11);
+      const fy = this.cy + Math.sin(this.angle) * (i * 11);
+      const box = { x: fx - 3, y: fy - 3, w: 6, h: 6 };
+      if (overlaps(box, player)) {
+        player.hurt(game, player.cx < fx ? -1 : 1);
+        return;
+      }
+    }
+  }
+}
+class BoostRing {
+  constructor(x, y, dirX = 1, dirY = -0.35) {
+    this.x = x;
+    this.y = y;
+    this.w = 18;
+    this.h = 18;
+    const len = Math.hypot(dirX, dirY) || 1;
+    this.dirX = dirX / len;
+    this.dirY = dirY / len;
+    this.cooldown = 0;
+  }
+
+  update(dt, player, game) {
+    if (this.cooldown > 0) {
+      this.cooldown -= dt;
+      return;
+    }
+    if (overlaps(this, player)) {
+      this.cooldown = 0.45;
+      player.groundPounding = false;
+      player.dashTimer = 0;
+      player.vx = this.dirX * 330;
+      player.vy = this.dirY * 330;
+      player.canDash = true;
+      player.onGround = false;
+      player.setSquash(1.38, 0.72);
+      game.sound.playSpring();
+      game.hitstop = 0.03;
+      game.addShake(4);
+      const col = game.phase === PHASE.LUNAR ? '#4ae3ff' : '#ffd54f';
+      game.particles.burst(this.x + 9, this.y + 9, 16, col, { speedMax: 150, gravity: 0, glow: true });
+      game.particles.spawnRipple(this.x + 9, this.y + 9, col, 48);
+      game.particles.spawnText(this.x + 9, this.y - 4, 'BOOST!', '#fff3a8');
+    }
   }
 }
 
@@ -3778,10 +3914,13 @@ class Renderer {
       this._drawInteractiveGrass(ctx, particles.grass, pal.grass);
     }
 
-    // 3. Entities (Platforms, Springs, Checkpoints, Coins, Crystals, Enemies, Boss)
+    // 3. Entities (Updrafts, Platforms, Springs, BoostRings, Firebars, Checkpoints, Coins, Crystals, Enemies, Boss)
     if (level) {
+      this._drawUpdrafts(ctx, game.updrafts, phase, time);
       this._drawPlatforms(ctx, game.platforms, phase);
       this._drawSprings(ctx, game.springs);
+      this._drawBoostRings(ctx, game.boostRings, phase, time);
+      this._drawFirebars(ctx, game.firebars, time);
       this._drawCheckpoints(ctx, game.checkpoints, time, phase);
       this._drawPickups(ctx, game.coinsList, game.hearts, game.dashCrystals, time);
       this._drawEnemies(ctx, game.enemies, phase, time);
@@ -4075,6 +4214,9 @@ class Renderer {
           case TILE.DIRT:
             ctx.drawImage(isLunar ? bt.dirtLunar : bt.dirtSolar, px, py);
             break;
+          case TILE.ICE:
+            ctx.drawImage(t.ice, px, py);
+            break;
           case TILE.BRICK:
             ctx.drawImage(t.brick, px, py);
             break;
@@ -4175,6 +4317,70 @@ class Renderer {
       ctx.lineTo(tipX, tipY);
     }
     ctx.stroke();
+  }
+
+  _drawUpdrafts(ctx, updrafts, phase, time) {
+    if (!updrafts || !updrafts.length) return;
+    const col = phase === PHASE.LUNAR ? 'rgba(120, 245, 255, 0.22)' : 'rgba(255, 242, 185, 0.22)';
+    const streak = phase === PHASE.LUNAR ? 'rgba(180, 252, 255, 0.55)' : 'rgba(255, 252, 215, 0.55)';
+    for (const u of updrafts) {
+      ctx.fillStyle = col;
+      ctx.fillRect(u.x, u.y, u.w, u.h);
+      ctx.fillStyle = streak;
+      for (let i = 0; i < 5; i++) {
+        const sx = u.x + 3 + i * 4.5;
+        const sy = u.y + u.h - (((time * 120 + i * 27) % u.h));
+        ctx.fillRect(Math.round(sx), Math.round(sy), 1.5, 10);
+      }
+    }
+  }
+
+  _drawBoostRings(ctx, rings, phase, time) {
+    if (!rings || !rings.length) return;
+    const col = phase === PHASE.LUNAR ? '#4ae3ff' : '#ffd54f';
+    for (const r of rings) {
+      const cx = r.x + 9;
+      const cy = r.y + 9;
+      const pulse = 8 + Math.sin(time * 8) * 1.4;
+      ctx.save();
+      ctx.globalAlpha = r.cooldown > 0 ? 0.35 : 0.95;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      // Direction chevron inside ring
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(cx + r.dirX * 5, cy + r.dirY * 5);
+      ctx.lineTo(cx - r.dirY * 3 - r.dirX * 2, cy + r.dirX * 3 - r.dirY * 2);
+      ctx.lineTo(cx + r.dirY * 3 - r.dirX * 2, cy - r.dirX * 3 - r.dirY * 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  _drawFirebars(ctx, firebars, time) {
+    if (!firebars || !firebars.length) return;
+    for (const fb of firebars) {
+      // Anchor hub
+      ctx.fillStyle = '#292230';
+      ctx.fillRect(Math.round(fb.cx - 4), Math.round(fb.cy - 4), 8, 8);
+      ctx.fillStyle = '#ff9838';
+      ctx.fillRect(Math.round(fb.cx - 2), Math.round(fb.cy - 2), 4, 4);
+      // Orbiting fireballs
+      for (let i = 1; i <= fb.count; i++) {
+        const fx = fb.cx + Math.cos(fb.angle) * (i * 11);
+        const fy = fb.cy + Math.sin(fb.angle) * (i * 11);
+        ctx.fillStyle = '#ff4229';
+        ctx.beginPath();
+        ctx.arc(fx, fy, 4 + Math.sin(time * 18 + i) * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff399';
+        ctx.fillRect(Math.round(fx - 1.5), Math.round(fy - 1.5), 3, 3);
+      }
+    }
   }
 
   _drawPlatforms(ctx, platforms, phase) {
@@ -4882,6 +5088,9 @@ class Game {
     this.springs = [];
     this.checkpoints = [];
     this.platforms = [];
+    this.updrafts = [];
+    this.firebars = [];
+    this.boostRings = [];
     this.enemies = [];
     this.projectiles = [];
     this.boss = null;
@@ -4922,6 +5131,9 @@ class Game {
     this.springs = [];
     this.checkpoints = [];
     this.platforms = [];
+    this.updrafts = [];
+    this.firebars = [];
+    this.boostRings = [];
     this.enemies = [];
     this.projectiles = [];
     this.boss = null;
@@ -4934,6 +5146,9 @@ class Game {
         case 'spring': this.springs.push(new Springboard(sp.x, sp.y)); break;
         case 'checkpoint': this.checkpoints.push(new Checkpoint(sp.x, sp.y)); break;
         case 'platform': this.platforms.push(new MovingPlatform(sp.x, sp.y, sp.w, sp.rangeX, sp.rangeY, sp.speed)); break;
+        case 'updraft': this.updrafts.push(new UpdraftColumn(sp.x, sp.y, sp.h)); break;
+        case 'firebar': this.firebars.push(new Firebar(sp.x, sp.y, sp.count, sp.speed)); break;
+        case 'boost_ring': this.boostRings.push(new BoostRing(sp.x, sp.y, sp.dirX, sp.dirY)); break;
         case 'slime': this.enemies.push(new SlimeEnemy(sp.x, sp.y)); break;
         case 'beetle': this.enemies.push(new BeetleEnemy(sp.x, sp.y)); break;
         case 'wisp': this.enemies.push(new WispEnemy(sp.x, sp.y, sp.phase)); break;
@@ -5147,6 +5362,9 @@ class Game {
 
     for (const p of this.platforms) p.update(dt);
     this.player.update(dt, input, this);
+    for (const u of this.updrafts) u.update(dt, this.player, this);
+    for (const fb of this.firebars) fb.update(dt, this.player, this);
+    for (const br of this.boostRings) br.update(dt, this.player, this);
     for (const s of this.springs) s.update(dt, this.player, this);
     for (const cp of this.checkpoints) cp.update(dt, this.player, this);
     for (const c of this.coinsList) c.update(dt, this.time, this.player, this);

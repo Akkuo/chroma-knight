@@ -10,6 +10,9 @@ import {
   Springboard,
   Checkpoint,
   MovingPlatform,
+  UpdraftColumn,
+  Firebar,
+  BoostRing,
   SlimeEnemy,
   BeetleEnemy,
   WispEnemy,
@@ -50,6 +53,9 @@ export class Game {
     this.springs = [];
     this.checkpoints = [];
     this.platforms = [];
+    this.updrafts = [];
+    this.firebars = [];
+    this.boostRings = [];
     this.enemies = [];
     this.projectiles = [];
     this.boss = null;
@@ -90,6 +96,9 @@ export class Game {
     this.springs = [];
     this.checkpoints = [];
     this.platforms = [];
+    this.updrafts = [];
+    this.firebars = [];
+    this.boostRings = [];
     this.enemies = [];
     this.projectiles = [];
     this.boss = null;
@@ -102,6 +111,9 @@ export class Game {
         case 'spring': this.springs.push(new Springboard(sp.x, sp.y)); break;
         case 'checkpoint': this.checkpoints.push(new Checkpoint(sp.x, sp.y)); break;
         case 'platform': this.platforms.push(new MovingPlatform(sp.x, sp.y, sp.w, sp.rangeX, sp.rangeY, sp.speed)); break;
+        case 'updraft': this.updrafts.push(new UpdraftColumn(sp.x, sp.y, sp.h)); break;
+        case 'firebar': this.firebars.push(new Firebar(sp.x, sp.y, sp.count, sp.speed)); break;
+        case 'boost_ring': this.boostRings.push(new BoostRing(sp.x, sp.y, sp.dirX, sp.dirY)); break;
         case 'slime': this.enemies.push(new SlimeEnemy(sp.x, sp.y)); break;
         case 'beetle': this.enemies.push(new BeetleEnemy(sp.x, sp.y)); break;
         case 'wisp': this.enemies.push(new WispEnemy(sp.x, sp.y, sp.phase)); break;
@@ -315,6 +327,9 @@ export class Game {
 
     for (const p of this.platforms) p.update(dt);
     this.player.update(dt, input, this);
+    for (const u of this.updrafts) u.update(dt, this.player, this);
+    for (const fb of this.firebars) fb.update(dt, this.player, this);
+    for (const br of this.boostRings) br.update(dt, this.player, this);
     for (const s of this.springs) s.update(dt, this.player, this);
     for (const cp of this.checkpoints) cp.update(dt, this.player, this);
     for (const c of this.coinsList) c.update(dt, this.time, this.player, this);

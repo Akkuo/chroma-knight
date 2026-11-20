@@ -13,11 +13,15 @@ export const EDITOR_PALETTE = [
   { id: 'tile:8', label: '尖刺', kind: 'tile', tile: TILE.SPIKE, color: '#ff5978' },
   { id: 'tile:12', label: '水面', kind: 'tile', tile: TILE.WATER, color: '#38c7e0' },
   { id: 'tile:14', label: '岩漿', kind: 'tile', tile: TILE.LAVA, color: '#ff5238' },
+  { id: 'tile:17', label: '冰塊', kind: 'tile', tile: TILE.ICE, color: '#8ae8ff' },
   { id: 'tile:13', label: '石柱', kind: 'tile', tile: TILE.PILLAR, color: '#6b7299' },
   { id: 'tile:0', label: '橡皮擦', kind: 'tile', tile: TILE.EMPTY, color: '#33384d' },
   { id: 'ent:coin', label: '金幣', kind: 'entity', ent: 'coin', color: '#ffe169' },
   { id: 'ent:dash_crystal', label: '衝刺晶', kind: 'entity', ent: 'dash_crystal', color: '#4af7c8' },
   { id: 'ent:spring', label: '彈簧', kind: 'entity', ent: 'spring', color: '#ff6b7a' },
+  { id: 'ent:boost_ring', label: '彈射環', kind: 'entity', ent: 'boost_ring', color: '#ffe066' },
+  { id: 'ent:updraft', label: '氣流柱', kind: 'entity', ent: 'updraft', color: '#b5f6ff' },
+  { id: 'ent:firebar', label: '火球鏈', kind: 'entity', ent: 'firebar', color: '#ff6a2e' },
   { id: 'ent:checkpoint', label: '存檔燈', kind: 'entity', ent: 'checkpoint', color: '#ffd966' },
   { id: 'ent:slime', label: '史萊姆', kind: 'entity', ent: 'slime', color: '#58e076' },
   { id: 'ent:beetle', label: '甲殼蟲', kind: 'entity', ent: 'beetle', color: '#e0485e' },
@@ -228,6 +232,9 @@ export class LevelEditor {
       if (sel.ent === 'coin') spawn = { type: 'coin', x: px + 3, y: py + 3 };
       else if (sel.ent === 'dash_crystal') spawn = { type: 'dash_crystal', x: px + 2, y: py + 2 };
       else if (sel.ent === 'spring') spawn = { type: 'spring', x: px, y: py };
+      else if (sel.ent === 'boost_ring') spawn = { type: 'boost_ring', x: px - 1, y: py - 1, dirX: 1, dirY: -0.38 };
+      else if (sel.ent === 'updraft') spawn = { type: 'updraft', x: px - 4, y: py + 16, h: 128 };
+      else if (sel.ent === 'firebar') spawn = { type: 'firebar', x: px, y: py, count: 4, speed: 2.0 };
       else if (sel.ent === 'checkpoint') spawn = { type: 'checkpoint', x: px, y: py - 8 };
       else if (sel.ent === 'slime') spawn = { type: 'slime', x: px, y: py + 2 };
       else if (sel.ent === 'beetle') spawn = { type: 'beetle', x: px, y: py + 2 };
