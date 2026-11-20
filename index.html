@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CHROMA KNIGHT — 稜鏡騎士</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main id="stage-shell">
+      <div id="canvas-wrap">
+        <canvas id="game" width="480" height="270"></canvas>
+        <div id="crt-overlay" class="crt-on"></div>
+      </div>
+
+      <footer id="controls-bar">
+        <span class="badge solar" id="phase-pill">SOLAR 熾陽</span>
+        <span><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> 移動</span>
+        <span><kbd>Space</kbd> / <kbd>Z</kbd> 跳躍・蹬牆跳</span>
+        <span><kbd>X</kbd> / <kbd>J</kbd> 衝刺</span>
+        <span><kbd>Shift</kbd> / <kbd>K</kbd> / <kbd>E</kbd> 相位切換</span>
+        <span><kbd>↓</kbd> 空中重擊</span>
+        <span><kbd>R</kbd> 重來</span>
+        <span><kbd>M</kbd> 靜音</span>
+        <span><kbd>V</kbd> CRT</span>
+        <span><kbd>F3</kbd> 除錯</span>
+      </footer>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
