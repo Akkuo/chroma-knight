@@ -371,32 +371,138 @@ const PHYSICS = {
   WALL_COYOTE_TIME: 0.11,
   CORNER_CORRECT_PX: 5,
 };
+const BIOME_THEMES = {
+  ruins: {
+    weather: 'fireflies',
+    bgStyle: 'arches',
+    solar: {
+      skyTop: '#24143a', skyMid: '#7c2f4b', skyBot: '#f0944d',
+      sunColor: '#fff2b0', sunGlow: 'rgba(255, 194, 88, 0.35)',
+      mountainFar: '#3d1f44', mountainMid: '#582949', propColor: '#46223e',
+      ambient: 'rgba(255, 174, 72, 0.05)', grass: '#74e86b',
+      tileTop: '#44c767', tileTopDark: '#268a4d', tileTopHi: '#7ee872',
+      tileDirt: '#7a4b38', tileDirtDark: '#522f26', tileDirtHi: '#9e674d',
+    },
+    lunar: {
+      skyTop: '#070b1c', skyMid: '#13244b', skyBot: '#1d4c73',
+      sunColor: '#d9f8ff', sunGlow: 'rgba(84, 218, 255, 0.34)',
+      mountainFar: '#101d3b', mountainMid: '#162d54', propColor: '#122442',
+      ambient: 'rgba(64, 200, 255, 0.07)', grass: '#6ef7e8',
+      tileTop: '#39c9c4', tileTopDark: '#1d7588', tileTopHi: '#8cf7ee',
+      tileDirt: '#3a355c', tileDirtDark: '#25213e', tileDirtHi: '#564f82',
+    },
+  },
+  chasm: {
+    weather: 'prism',
+    bgStyle: 'crystals',
+    solar: {
+      skyTop: '#2a0f3b', skyMid: '#7a225c', skyBot: '#e86f7c',
+      sunColor: '#ffe0b5', sunGlow: 'rgba(255, 140, 150, 0.38)',
+      mountainFar: '#40174f', mountainMid: '#5e215e', propColor: '#8f3a84',
+      ambient: 'rgba(255, 110, 140, 0.06)', grass: '#ff96b4',
+      tileTop: '#d95b8b', tileTopDark: '#8f2d5e', tileTopHi: '#ffa6c6',
+      tileDirt: '#59335c', tileDirtDark: '#381d3d', tileDirtHi: '#7d4d82',
+    },
+    lunar: {
+      skyTop: '#0d0924', skyMid: '#241a59', skyBot: '#2d5b8f',
+      sunColor: '#e2d9ff', sunGlow: 'rgba(154, 128, 255, 0.36)',
+      mountainFar: '#191342', mountainMid: '#252163', propColor: '#4848a8',
+      ambient: 'rgba(120, 110, 255, 0.07)', grass: '#9ef2ff',
+      tileTop: '#6b7cff', tileTopDark: '#3c43a8', tileTopHi: '#b5c4ff',
+      tileDirt: '#2c2754', tileDirtDark: '#1a1638', tileDirtHi: '#463f7d',
+    },
+  },
+  aqueduct: {
+    weather: 'rain',
+    bgStyle: 'waterfalls',
+    solar: {
+      skyTop: '#0f2b38', skyMid: '#1f636e', skyBot: '#6dc4a6',
+      sunColor: '#eaffc4', sunGlow: 'rgba(154, 245, 198, 0.34)',
+      mountainFar: '#164552', mountainMid: '#1f5e66', propColor: '#297075',
+      ambient: 'rgba(92, 224, 180, 0.06)', grass: '#84ffba',
+      tileTop: '#36c98e', tileTopDark: '#1c7d64', tileTopHi: '#96ffd0',
+      tileDirt: '#3d5e66', tileDirtDark: '#263d45', tileDirtHi: '#5a828c',
+    },
+    lunar: {
+      skyTop: '#04141f', skyMid: '#0b2f45', skyBot: '#145e73',
+      sunColor: '#c4ffff', sunGlow: 'rgba(64, 232, 232, 0.36)',
+      mountainFar: '#0a2233', mountainMid: '#0e364d', propColor: '#164b63',
+      ambient: 'rgba(48, 210, 224, 0.08)', grass: '#66f7ff',
+      tileTop: '#24b8c9', tileTopDark: '#12647a', tileTopHi: '#8ef5ff',
+      tileDirt: '#233b4d', tileDirtDark: '#152633', tileDirtHi: '#395b73',
+    },
+  },
+  foundry: {
+    weather: 'embers',
+    bgStyle: 'gears',
+    solar: {
+      skyTop: '#1f090d', skyMid: '#5e1714', skyBot: '#c94c1a',
+      sunColor: '#ffcf66', sunGlow: 'rgba(255, 120, 32, 0.42)',
+      mountainFar: '#330e10', mountainMid: '#4d1714', propColor: '#66241c',
+      ambient: 'rgba(255, 102, 34, 0.08)', grass: '#ff9447',
+      tileTop: '#cc522b', tileTopDark: '#7d2416', tileTopHi: '#ff9654',
+      tileDirt: '#3d2a2e', tileDirtDark: '#24181c', tileDirtHi: '#5c4147',
+    },
+    lunar: {
+      skyTop: '#12081c', skyMid: '#2e1238', skyBot: '#611d4a',
+      sunColor: '#ffd4e5', sunGlow: 'rgba(255, 88, 152, 0.36)',
+      mountainFar: '#1f0d2b', mountainMid: '#331542', propColor: '#4c205e',
+      ambient: 'rgba(200, 68, 160, 0.07)', grass: '#ff80c4',
+      tileTop: '#9c4287', tileTopDark: '#591e52', tileTopHi: '#e080c8',
+      tileDirt: '#291e36', tileDirtDark: '#181021', tileDirtHi: '#423154',
+    },
+  },
+  spire: {
+    weather: 'snow',
+    bgStyle: 'aurora',
+    solar: {
+      skyTop: '#162044', skyMid: '#3c548c', skyBot: '#99c4e6',
+      sunColor: '#ffffff', sunGlow: 'rgba(200, 232, 255, 0.4)',
+      mountainFar: '#263866', mountainMid: '#3a548c', propColor: '#5674ad',
+      ambient: 'rgba(180, 224, 255, 0.06)', grass: '#d4f7ff',
+      tileTop: '#8cd4f5', tileTopDark: '#4786b8', tileTopHi: '#e6fbff',
+      tileDirt: '#4d5d80', tileDirtDark: '#303b57', tileDirtHi: '#6f84b0',
+    },
+    lunar: {
+      skyTop: '#050b1f', skyMid: '#0e244a', skyBot: '#1d546e',
+      sunColor: '#e6fcff', sunGlow: 'rgba(92, 245, 218, 0.38)',
+      mountainFar: '#0c1b38', mountainMid: '#153159', propColor: '#214d7a',
+      ambient: 'rgba(84, 235, 210, 0.07)', grass: '#8effe8',
+      tileTop: '#56d9d4', tileTopDark: '#26788a', tileTopHi: '#c4fff9',
+      tileDirt: '#293857', tileDirtDark: '#182238', tileDirtHi: '#415780',
+    },
+  },
+  sanctum: {
+    weather: 'runes',
+    bgStyle: 'cathedral',
+    solar: {
+      skyTop: '#1a0f2e', skyMid: '#4a2359', skyBot: '#c98838',
+      sunColor: '#fff5ba', sunGlow: 'rgba(255, 210, 96, 0.42)',
+      mountainFar: '#2b1842', mountainMid: '#422559', propColor: '#5c366b',
+      ambient: 'rgba(255, 200, 88, 0.07)', grass: '#ffe078',
+      tileTop: '#e0a938', tileTopDark: '#8f5916', tileTopHi: '#fff0a6',
+      tileDirt: '#382c4a', tileDirtDark: '#221a30', tileDirtHi: '#574670',
+    },
+    lunar: {
+      skyTop: '#06071a', skyMid: '#151842', skyBot: '#29387a',
+      sunColor: '#d9f5ff', sunGlow: 'rgba(110, 210, 255, 0.4)',
+      mountainFar: '#101233', mountainMid: '#1b2052', propColor: '#2c3575',
+      ambient: 'rgba(100, 175, 255, 0.08)', grass: '#9ef2ff',
+      tileTop: '#5ce0ff', tileTopDark: '#2472ad', tileTopHi: '#d4fcff',
+      tileDirt: '#202242', tileDirtDark: '#121329', tileDirtHi: '#373b6b',
+    },
+  },
+};
 const PALETTES = {
   solar: {
-    skyTop: '#24143a',
-    skyMid: '#7c2f4b',
-    skyBot: '#f0944d',
-    sunColor: '#fff2b0',
-    sunGlow: 'rgba(255, 194, 88, 0.35)',
-    mountainFar: '#3d1f44',
-    mountainMid: '#582949',
-    ruinsFar: '#46223e',
-    ambient: 'rgba(255, 174, 72, 0.06)',
+    ...BIOME_THEMES.ruins.solar,
     accent: '#ffbe44',
     accentBright: '#fff1a8',
     cape: '#ff5247',
     capeTip: '#ffcb47',
   },
   lunar: {
-    skyTop: '#070b1c',
-    skyMid: '#13244b',
-    skyBot: '#1d4c73',
-    sunColor: '#d9f8ff',
-    sunGlow: 'rgba(84, 218, 255, 0.34)',
-    mountainFar: '#101d3b',
-    mountainMid: '#162d54',
-    ruinsFar: '#122442',
-    ambient: 'rgba(64, 200, 255, 0.08)',
+    ...BIOME_THEMES.ruins.lunar,
     accent: '#4ae3ff',
     accentBright: '#d4fcff',
     cape: '#35d0ff',
@@ -719,16 +825,29 @@ function flipH(src) {
 function createSpriteAtlas() {
   const atlas = {
     tiles: {},
+    biomes: {},
     player: { solar: {}, lunar: {} },
     enemies: {},
     items: {},
   };
 
-  // --- TILES (16x16) ---
-  atlas.tiles.groundSolar = bakeGroundTile('#44c767', '#268a4d', '#7ee872', '#7a4b38', '#522f26', '#9e674d');
-  atlas.tiles.groundLunar = bakeGroundTile('#39c9c4', '#1d7588', '#8cf7ee', '#3a355c', '#25213e', '#564f82');
-  atlas.tiles.dirtSolar = bakeDirtTile('#7a4b38', '#522f26', '#9e674d', '#3e211b');
-  atlas.tiles.dirtLunar = bakeDirtTile('#3a355c', '#25213e', '#564f82', '#1a162e');
+  // --- PER-BIOME GROUND & DIRT TILES (6 Biomes x Solar/Lunar) ---
+  for (const [bName, bDef] of Object.entries(BIOME_THEMES)) {
+    const s = bDef.solar;
+    const l = bDef.lunar;
+    atlas.biomes[bName] = {
+      groundSolar: bakeGroundTile(s.tileTop, s.tileTopDark, s.tileTopHi, s.tileDirt, s.tileDirtDark, s.tileDirtHi),
+      groundLunar: bakeGroundTile(l.tileTop, l.tileTopDark, l.tileTopHi, l.tileDirt, l.tileDirtDark, l.tileDirtHi),
+      dirtSolar: bakeDirtTile(s.tileDirt, s.tileDirtDark, s.tileDirtHi, '#1a1218'),
+      dirtLunar: bakeDirtTile(l.tileDirt, l.tileDirtDark, l.tileDirtHi, '#0e101c'),
+    };
+  }
+
+  // --- SHARED TILES (16x16) ---
+  atlas.tiles.groundSolar = atlas.biomes.ruins.groundSolar;
+  atlas.tiles.groundLunar = atlas.biomes.ruins.groundLunar;
+  atlas.tiles.dirtSolar = atlas.biomes.ruins.dirtSolar;
+  atlas.tiles.dirtLunar = atlas.biomes.ruins.dirtLunar;
   atlas.tiles.brick = bakeBrickTile();
   atlas.tiles.question = bakeQuestionTile(false);
   atlas.tiles.questionGlow = bakeQuestionTile(true);
@@ -2225,6 +2344,7 @@ const STAGE_6_MAP = [
 const STAGE_DEFS = [
   {
     id: 1,
+    biome: 'ruins',
     name: 'STAGE 1/6 — 晨光遺跡',
     subtitle: 'Sunlit Ruins',
     startPhase: PHASE.SOLAR,
@@ -2234,47 +2354,52 @@ const STAGE_DEFS = [
   },
   {
     id: 2,
+    biome: 'chasm',
     name: 'STAGE 2/6 — 稜鏡峽谷',
     subtitle: 'Prism Chasm',
     startPhase: PHASE.LUNAR,
     map: STAGE_2_MAP,
-    hint: '星月相位擁有低重力浮空！善用 衝刺水晶 與 蹬牆跳 穿越裂谷！',
+    hint: '紫晶峽谷！星月相位擁有低重力浮空，善用衝刺水晶與蹬牆跳穿越裂谷！',
     hasBoss: false,
   },
   {
     id: 3,
+    biome: 'aqueduct',
     name: 'STAGE 3/6 — 翡翠水殿',
     subtitle: 'Emerald Aqueduct',
     startPhase: PHASE.SOLAR,
     map: STAGE_3_MAP,
-    hint: '翡翠水道！踢出甲殼甲蟲一路撞飛敵人與裂石，彈簧直衝高空隱藏寶庫！',
+    hint: '雨幕瀑布水殿！踢出甲殼甲蟲撞飛敵人與裂石，彈簧直衝高空隱藏寶庫！',
     hasBoss: false,
   },
   {
     id: 4,
+    biome: 'foundry',
     name: 'STAGE 4/6 — 熾焰鍛爐',
     subtitle: 'Solar Foundry',
     startPhase: PHASE.SOLAR,
     map: STAGE_4_MAP,
-    hint: '岩漿鍛爐試煉！精準把握崩塌磚節奏與空中衝刺水晶連跳！',
+    hint: '火山齒輪鍛爐！精準把握崩塌磚節奏與空中衝刺水晶連跳！',
     hasBoss: false,
   },
   {
     id: 5,
+    biome: 'spire',
     name: 'STAGE 5/6 — 星月高塔',
     subtitle: 'Lunar Spire',
     startPhase: PHASE.LUNAR,
     map: STAGE_5_MAP,
-    hint: '雙塔攀升！在垂直井道中交替切換 熾陽/星月 相位並配合蹬牆跳登頂！',
+    hint: '極光雪峰雙塔！在垂直井道中交替切換熾陽/星月相位並配合蹬牆跳登頂！',
     hasBoss: false,
   },
   {
     id: 6,
+    biome: 'sanctum',
     name: 'STAGE 6/6 — 雙相聖殿',
     subtitle: 'Twin-Phase Sanctum',
     startPhase: PHASE.SOLAR,
     map: STAGE_6_MAP,
-    hint: '最終決戰：擊敗聖殿深處的【稜鏡巨像】！踩踏頭頂核心或踢龜殼造成雙倍暴擊！',
+    hint: '聖殿最終決戰：擊敗【稜鏡巨像】！踩踏頭頂核心或踢龜殼造成雙倍暴擊！',
     hasBoss: true,
   },
 ];
@@ -2282,6 +2407,7 @@ class Level {
   constructor(def) {
     this.def = def;
     this.id = def.id;
+    this.biome = def.biome || 'ruins';
     this.name = def.name;
     this.subtitle = def.subtitle;
     this.hint = def.hint;
@@ -3627,15 +3753,17 @@ class Renderer {
   render(game) {
     const ctx = this.ctx;
     const { phase, time, level, player, particles, camera } = game;
-    const pal = PALETTES[phase];
+    const biomeId = (level && level.biome) || 'ruins';
+    const biomeDef = BIOME_THEMES[biomeId] || BIOME_THEMES.ruins;
+    const pal = { ...PALETTES[phase], ...biomeDef[phase] };
 
     // --- PASS 1: CRISP PIXEL-ART WORLD (scaled cleanly to native HiDPI) ---
     ctx.save();
     ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     ctx.imageSmoothingEnabled = false;
 
-    // 1. Sky & Parallax Background
-    this._drawBackground(ctx, pal, phase, time, camera.x);
+    // 1. Sky & Biome-Specific Parallax Background
+    this._drawBackground(ctx, pal, biomeDef, phase, time, camera.x);
 
     // World Space Transform (with camera + micro-shake)
     const camX = Math.round(camera.x + camera.shakeX);
@@ -3644,10 +3772,10 @@ class Renderer {
     ctx.save();
     ctx.translate(-camX, -camY);
 
-    // 2. Tilemap
+    // 2. Tilemap (biome-specific tileset + grass tint)
     if (level) {
       this._drawTiles(ctx, level, phase, time, camX);
-      this._drawInteractiveGrass(ctx, particles.grass, phase);
+      this._drawInteractiveGrass(ctx, particles.grass, pal.grass);
     }
 
     // 3. Entities (Platforms, Springs, Checkpoints, Coins, Crystals, Enemies, Boss)
@@ -3678,8 +3806,8 @@ class Renderer {
       this._drawWaterReflections(ctx, game, camX, time);
     }
 
-    // 5. Particles & Ripples
-    this._drawAmbient(ctx, particles.ambient, phase, time);
+    // 5. Biome Weather, Particles & Ripples
+    this._drawAmbient(ctx, particles.ambient, biomeDef.weather, phase, time, camX);
     this._drawParticles(ctx, particles.particles);
     this._drawRipples(ctx, particles.ripples);
 
@@ -3722,7 +3850,7 @@ class Renderer {
     ctx.restore();
   }
 
-  _drawBackground(ctx, pal, phase, time, camX) {
+  _drawBackground(ctx, pal, biomeDef, phase, time, camX) {
     const grad = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
     grad.addColorStop(0, pal.skyTop);
     grad.addColorStop(0.55, pal.skyMid);
@@ -3730,12 +3858,30 @@ class Renderer {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Stars (brighter in lunar, faint high-altitude stars in solar)
-    const starAlpha = phase === PHASE.LUNAR ? 0.92 : 0.25;
+    // Stars (brighter in lunar / spire / sanctum)
+    const starAlpha = phase === PHASE.LUNAR || biomeDef.bgStyle === 'aurora' || biomeDef.bgStyle === 'cathedral' ? 0.9 : 0.25;
     for (const s of this.stars) {
       const tw = 0.4 + 0.6 * Math.sin(time * s.speed + s.phase);
       ctx.fillStyle = `rgba(235, 248, 255, ${(tw * starAlpha).toFixed(2)})`;
       ctx.fillRect(Math.floor(s.x), Math.floor(s.y), s.size, s.size);
+    }
+
+    // Aurora Borealis ribbons for Stage 5 (Spire)
+    if (biomeDef.bgStyle === 'aurora') {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let band = 0; band < 3; band++) {
+        ctx.strokeStyle = band === 0 ? 'rgba(72, 245, 210, 0.22)' : band === 1 ? 'rgba(92, 180, 255, 0.18)' : 'rgba(186, 120, 255, 0.16)';
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        for (let x = 0; x <= GAME_WIDTH; x += 16) {
+          const y = 42 + band * 18 + Math.sin(x * 0.018 + time * 1.4 + band * 2) * 14;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     // Sun / Crescent Moon
@@ -3759,7 +3905,7 @@ class Renderer {
     }
 
     // Parallax Clouds
-    ctx.fillStyle = phase === PHASE.SOLAR ? 'rgba(255, 212, 168, 0.16)' : 'rgba(120, 210, 255, 0.11)';
+    ctx.fillStyle = phase === PHASE.SOLAR ? 'rgba(255, 212, 168, 0.14)' : 'rgba(120, 210, 255, 0.10)';
     for (let i = 0; i < 6; i++) {
       const cx = ((i * 110 - camX * 0.08 - time * 6) % (GAME_WIDTH + 120) + GAME_WIDTH + 120) % (GAME_WIDTH + 120) - 60;
       const cy = 34 + (i % 3) * 26;
@@ -3767,21 +3913,126 @@ class Renderer {
       ctx.fillRect(Math.floor(cx) + 10, cy - 5, 24, 5);
     }
 
-    // Far Mountains
+    // Far & Mid Mountains
     this._drawMountainLayer(ctx, camX * 0.14, 168, 52, 72, pal.mountainFar);
-    // Mid Mountains + Ruin silhouettes
     this._drawMountainLayer(ctx, camX * 0.3, 196, 36, 54, pal.mountainMid);
 
-    // Distant Ruins Arches
-    ctx.fillStyle = pal.ruinsFar;
-    const archSpacing = 96;
-    const startArch = Math.floor((camX * 0.42) / archSpacing) - 1;
-    for (let i = startArch; i < startArch + 7; i++) {
-      const ax = Math.floor(i * archSpacing - camX * 0.42);
-      const h = 36 + ((Math.abs(i * 17) % 3) * 14);
-      ctx.fillRect(ax, GAME_HEIGHT - h - 22, 10, h + 22);
-      ctx.fillRect(ax + 24, GAME_HEIGHT - h - 22, 10, h + 22);
-      ctx.fillRect(ax - 2, GAME_HEIGHT - h - 26, 38, 6);
+    // Biome-Specific Midground Landmarks
+    this._drawBiomeLandmarks(ctx, biomeDef.bgStyle, pal, phase, time, camX);
+  }
+
+  _drawBiomeLandmarks(ctx, style, pal, phase, time, camX) {
+    const scroll = camX * 0.42;
+
+    if (style === 'arches') {
+      ctx.fillStyle = pal.propColor;
+      const spacing = 96;
+      const start = Math.floor(scroll / spacing) - 1;
+      for (let i = start; i < start + 7; i++) {
+        const ax = Math.floor(i * spacing - scroll);
+        const h = 36 + ((Math.abs(i * 17) % 3) * 14);
+        ctx.fillRect(ax, GAME_HEIGHT - h - 22, 10, h + 22);
+        ctx.fillRect(ax + 24, GAME_HEIGHT - h - 22, 10, h + 22);
+        ctx.fillRect(ax - 2, GAME_HEIGHT - h - 26, 38, 6);
+      }
+    } else if (style === 'crystals') {
+      const spacing = 84;
+      const start = Math.floor(scroll / spacing) - 1;
+      for (let i = start; i < start + 8; i++) {
+        const cx = Math.floor(i * spacing - scroll);
+        const h = 48 + ((Math.abs(i * 23) % 4) * 16);
+        const topY = GAME_HEIGHT - h - 18;
+        ctx.fillStyle = pal.propColor;
+        ctx.beginPath();
+        ctx.moveTo(cx, GAME_HEIGHT);
+        ctx.lineTo(cx + 11, topY);
+        ctx.lineTo(cx + 22, GAME_HEIGHT);
+        ctx.closePath();
+        ctx.fill();
+        // Glowing crystal ridge
+        ctx.fillStyle = phase === PHASE.LUNAR ? 'rgba(130, 224, 255, 0.35)' : 'rgba(255, 170, 210, 0.35)';
+        ctx.fillRect(cx + 10, topY + 4, 2, h - 8);
+      }
+    } else if (style === 'waterfalls') {
+      const spacing = 104;
+      const start = Math.floor(scroll / spacing) - 1;
+      for (let i = start; i < start + 7; i++) {
+        const wx = Math.floor(i * spacing - scroll);
+        // Aqueduct stone pillars
+        ctx.fillStyle = pal.propColor;
+        ctx.fillRect(wx, 92, 14, GAME_HEIGHT - 92);
+        ctx.fillRect(wx + 42, 92, 14, GAME_HEIGHT - 92);
+        ctx.fillRect(wx - 4, 86, 64, 10);
+        // Animated cascading waterfall between pillars
+        ctx.fillStyle = phase === PHASE.LUNAR ? 'rgba(72, 224, 245, 0.35)' : 'rgba(128, 245, 225, 0.38)';
+        ctx.fillRect(wx + 16, 96, 24, GAME_HEIGHT - 96);
+        ctx.fillStyle = 'rgba(230, 255, 255, 0.52)';
+        const fallOffset = Math.floor(time * 60) % 24;
+        for (let fy = 96 + fallOffset; fy < GAME_HEIGHT; fy += 24) {
+          ctx.fillRect(wx + 19, fy, 4, 10);
+          ctx.fillRect(wx + 31, (fy + 12) % GAME_HEIGHT, 4, 10);
+        }
+      }
+    } else if (style === 'gears') {
+      const spacing = 112;
+      const start = Math.floor(scroll / spacing) - 1;
+      for (let i = start; i < start + 7; i++) {
+        const gx = Math.floor(i * spacing - scroll) + 32;
+        const gy = 160 + ((i % 2) * 28);
+        const r = i % 2 === 0 ? 26 : 18;
+        const dir = i % 2 === 0 ? 1 : -1;
+        ctx.save();
+        ctx.translate(gx, gy);
+        ctx.rotate(time * 0.55 * dir);
+        ctx.fillStyle = pal.propColor;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fill();
+        for (let t = 0; t < 8; t++) {
+          ctx.rotate(Math.PI / 4);
+          ctx.fillRect(-3, -r - 5, 6, 7);
+        }
+        ctx.fillStyle = pal.mountainMid;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.42, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    } else if (style === 'aurora') {
+      // Floating celestial rings
+      const spacing = 128;
+      const start = Math.floor(scroll / spacing) - 1;
+      ctx.strokeStyle = phase === PHASE.LUNAR ? 'rgba(110, 245, 235, 0.28)' : 'rgba(220, 240, 255, 0.30)';
+      ctx.lineWidth = 2;
+      for (let i = start; i < start + 6; i++) {
+        const rx = Math.floor(i * spacing - scroll) + 40;
+        const ry = 124 + Math.sin(time * 1.4 + i) * 12;
+        ctx.beginPath();
+        ctx.arc(rx, ry, 20, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(rx, ry, 30, 8, Math.sin(time + i) * 0.25, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    } else if (style === 'cathedral') {
+      const spacing = 92;
+      const start = Math.floor(scroll / spacing) - 1;
+      for (let i = start; i < start + 7; i++) {
+        const sx = Math.floor(i * spacing - scroll);
+        ctx.fillStyle = pal.propColor;
+        ctx.fillRect(sx, 78, 36, GAME_HEIGHT - 78);
+        ctx.beginPath();
+        ctx.moveTo(sx, 78);
+        ctx.lineTo(sx + 18, 46);
+        ctx.lineTo(sx + 36, 78);
+        ctx.closePath();
+        ctx.fill();
+        // Glowing stained-glass lancet window
+        ctx.fillStyle = phase === PHASE.LUNAR ? 'rgba(92, 224, 255, 0.35)' : 'rgba(255, 210, 96, 0.38)';
+        ctx.fillRect(sx + 13, 92, 10, 44);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.fillRect(sx + 17, 92, 2, 44);
+      }
     }
   }
 
@@ -3804,6 +4055,7 @@ class Renderer {
     const startTx = Math.max(0, Math.floor(camX / TILE_SIZE) - 1);
     const endTx = Math.min(level.width - 1, Math.ceil((camX + GAME_WIDTH) / TILE_SIZE) + 1);
     const t = this.atlas.tiles;
+    const bt = (this.atlas.biomes && this.atlas.biomes[level.biome]) || t;
     const isLunar = phase === PHASE.LUNAR;
     const qTile = Math.floor(time * 4) % 2 === 0 ? t.question : t.questionGlow;
 
@@ -3818,10 +4070,10 @@ class Renderer {
 
         switch (tile) {
           case TILE.GROUND:
-            ctx.drawImage(isLunar ? t.groundLunar : t.groundSolar, px, py);
+            ctx.drawImage(isLunar ? bt.groundLunar : bt.groundSolar, px, py);
             break;
           case TILE.DIRT:
-            ctx.drawImage(isLunar ? t.dirtLunar : t.dirtSolar, px, py);
+            ctx.drawImage(isLunar ? bt.dirtLunar : bt.dirtSolar, px, py);
             break;
           case TILE.BRICK:
             ctx.drawImage(t.brick, px, py);
@@ -3911,9 +4163,8 @@ class Renderer {
     ctx.fillRect(cx - 1, cy - 2, 2, 8);
   }
 
-  _drawInteractiveGrass(ctx, grass, phase) {
-    const color = phase === PHASE.LUNAR ? '#6ef7e8' : '#74e86b';
-    ctx.strokeStyle = color;
+  _drawInteractiveGrass(ctx, grass, color) {
+    ctx.strokeStyle = color || '#74e86b';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i < grass.length; i++) {
@@ -4215,13 +4466,54 @@ class Renderer {
     ctx.restore();
   }
 
-  _drawAmbient(ctx, ambient, phase, time) {
-    const col = phase === PHASE.LUNAR ? '#80f4ff' : '#ffd573';
+  _drawAmbient(ctx, ambient, weather, phase, time, camX) {
+    if (weather === 'rain') {
+      ctx.strokeStyle = phase === PHASE.LUNAR ? 'rgba(130, 240, 255, 0.38)' : 'rgba(200, 255, 245, 0.36)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < 48; i++) {
+        const rx = camX + (((i * 37 - time * 140) % GAME_WIDTH) + GAME_WIDTH) % GAME_WIDTH;
+        const ry = ((i * 29 + time * 260) % GAME_HEIGHT);
+        ctx.moveTo(rx, ry);
+        ctx.lineTo(rx - 3, ry + 8);
+      }
+      ctx.stroke();
+      return;
+    }
+
+    if (weather === 'snow') {
+      ctx.fillStyle = '#e8fbff';
+      for (let i = 0; i < 42; i++) {
+        const sx = camX + (((i * 41 + Math.sin(time * 1.5 + i) * 18 - time * 16) % GAME_WIDTH) + GAME_WIDTH) % GAME_WIDTH;
+        const sy = (i * 23 + time * (26 + (i % 3) * 10)) % GAME_HEIGHT;
+        ctx.globalAlpha = 0.45 + (i % 3) * 0.18;
+        ctx.fillRect(Math.round(sx), Math.round(sy), i % 4 === 0 ? 2 : 1, i % 4 === 0 ? 2 : 1);
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    const col =
+      weather === 'embers'
+        ? phase === PHASE.LUNAR ? '#ff80d4' : '#ff7b2e'
+        : weather === 'prism'
+        ? phase === PHASE.LUNAR ? '#a8b8ff' : '#ff9ed2'
+        : weather === 'runes'
+        ? phase === PHASE.LUNAR ? '#6ef3ff' : '#ffe066'
+        : phase === PHASE.LUNAR ? '#80f4ff' : '#ffd573';
+
     for (const a of ambient) {
-      const alpha = 0.28 + 0.45 * Math.sin(time * 3 + a.phase);
+      const alpha = 0.32 + 0.5 * Math.sin(time * 3.5 + a.phase);
       ctx.fillStyle = col;
-      ctx.globalAlpha = Math.max(0.08, alpha);
-      ctx.fillRect(Math.round(a.x), Math.round(a.y), a.size, a.size);
+      ctx.globalAlpha = Math.max(0.1, alpha);
+      const ax = Math.round(a.x);
+      const ay = Math.round(a.y);
+      if (weather === 'prism' || weather === 'runes') {
+        ctx.fillRect(ax, ay - 1, 1, 3);
+        ctx.fillRect(ax - 1, ay, 3, 1);
+      } else {
+        ctx.fillRect(ax, ay, a.size, a.size);
+      }
     }
     ctx.globalAlpha = 1;
   }

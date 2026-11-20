@@ -155,6 +155,7 @@ const STAGE_6_MAP = [
 export const STAGE_DEFS = [
   {
     id: 1,
+    biome: 'ruins',
     name: 'STAGE 1/6 — 晨光遺跡',
     subtitle: 'Sunlit Ruins',
     startPhase: PHASE.SOLAR,
@@ -164,47 +165,52 @@ export const STAGE_DEFS = [
   },
   {
     id: 2,
+    biome: 'chasm',
     name: 'STAGE 2/6 — 稜鏡峽谷',
     subtitle: 'Prism Chasm',
     startPhase: PHASE.LUNAR,
     map: STAGE_2_MAP,
-    hint: '星月相位擁有低重力浮空！善用 衝刺水晶 與 蹬牆跳 穿越裂谷！',
+    hint: '紫晶峽谷！星月相位擁有低重力浮空，善用衝刺水晶與蹬牆跳穿越裂谷！',
     hasBoss: false,
   },
   {
     id: 3,
+    biome: 'aqueduct',
     name: 'STAGE 3/6 — 翡翠水殿',
     subtitle: 'Emerald Aqueduct',
     startPhase: PHASE.SOLAR,
     map: STAGE_3_MAP,
-    hint: '翡翠水道！踢出甲殼甲蟲一路撞飛敵人與裂石，彈簧直衝高空隱藏寶庫！',
+    hint: '雨幕瀑布水殿！踢出甲殼甲蟲撞飛敵人與裂石，彈簧直衝高空隱藏寶庫！',
     hasBoss: false,
   },
   {
     id: 4,
+    biome: 'foundry',
     name: 'STAGE 4/6 — 熾焰鍛爐',
     subtitle: 'Solar Foundry',
     startPhase: PHASE.SOLAR,
     map: STAGE_4_MAP,
-    hint: '岩漿鍛爐試煉！精準把握崩塌磚節奏與空中衝刺水晶連跳！',
+    hint: '火山齒輪鍛爐！精準把握崩塌磚節奏與空中衝刺水晶連跳！',
     hasBoss: false,
   },
   {
     id: 5,
+    biome: 'spire',
     name: 'STAGE 5/6 — 星月高塔',
     subtitle: 'Lunar Spire',
     startPhase: PHASE.LUNAR,
     map: STAGE_5_MAP,
-    hint: '雙塔攀升！在垂直井道中交替切換 熾陽/星月 相位並配合蹬牆跳登頂！',
+    hint: '極光雪峰雙塔！在垂直井道中交替切換熾陽/星月相位並配合蹬牆跳登頂！',
     hasBoss: false,
   },
   {
     id: 6,
+    biome: 'sanctum',
     name: 'STAGE 6/6 — 雙相聖殿',
     subtitle: 'Twin-Phase Sanctum',
     startPhase: PHASE.SOLAR,
     map: STAGE_6_MAP,
-    hint: '最終決戰：擊敗聖殿深處的【稜鏡巨像】！踩踏頭頂核心或踢龜殼造成雙倍暴擊！',
+    hint: '聖殿最終決戰：擊敗【稜鏡巨像】！踩踏頭頂核心或踢龜殼造成雙倍暴擊！',
     hasBoss: true,
   },
 ];
@@ -213,6 +219,7 @@ export class Level {
   constructor(def) {
     this.def = def;
     this.id = def.id;
+    this.biome = def.biome || 'ruins';
     this.name = def.name;
     this.subtitle = def.subtitle;
     this.hint = def.hint;

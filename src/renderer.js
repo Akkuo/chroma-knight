@@ -1,4 +1,4 @@
-import { GAME_WIDTH, GAME_HEIGHT, TILE, TILE_SIZE, PHASE, PALETTES, STATE } from './constants.js';
+import { GAME_WIDTH, GAME_HEIGHT, TILE, TILE_SIZE, PHASE, PALETTES, BIOME_THEMES, STATE } from './constants.js';
 
 export class Renderer {
   constructor(canvas, atlas, displayCanvas = null) {
@@ -39,15 +39,17 @@ export class Renderer {
   render(game) {
     const ctx = this.ctx;
     const { phase, time, level, player, particles, camera } = game;
-    const pal = PALETTES[phase];
+    const biomeId = (level && level.biome) || 'ruins';
+    const biomeDef = BIOME_THEMES[biomeId] || BIOME_THEMES.ruins;
+    const pal = { ...PALETTES[phase], ...biomeDef[phase] };
 
     // --- PASS 1: CRISP PIXEL-ART WORLD (scaled cleanly to native HiDPI) ---
     ctx.save();
     ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     ctx.imageSmoothingEnabled = false;
 
-    // 1. Sky & Parallax Background
-    this._drawBackground(ctx, pal, phase, time, camera.x);
+    // 1. Sky & Biome-Specific Parallax Background
+    this._drawBackground(ctx, pal, biomeDef, phase, time, camera.x);
 
     // World Space Transform (with camera + micro-shake)
     const camX = Math.round(camera.x + camera.shakeX);
@@ -56,10 +58,10 @@ export class Renderer {
     ctx.save();
     ctx.translate(-camX, -camY);
 
-    // 2. Tilemap
+    // 2. Tilemap (biome-specific tileset + grass tint)
     if (level) {
       this._drawTiles(ctx, level, phase, time, camX);
-      this._drawInteractiveGrass(ctx, particles.grass, phase);
+      this._drawInteractiveGrass(ctx, particles.grass, pal.grass);
     }
 
     // 3. Entities (Platforms, Springs, Checkpoints, Coins, Crystals, Enemies, Boss)
@@ -90,8 +92,8 @@ export class Renderer {
       this._drawWaterReflections(ctx, game, camX, time);
     }
 
-    // 5. Particles & Ripples
-    this._drawAmbient(ctx, particles.ambient, phase, time);
+    // 5. Biome Weather, Particles & Ripples
+    this._drawAmbient(ctx, particles.ambient, biomeDef.weather, phase, time, camX);
     this._drawParticles(ctx, particles.particles);
     this._drawRipples(ctx, particles.ripples);
 
@@ -134,7 +136,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  _drawBackground(ctx, pal, phase, time, camX) {
+  _drawBackground(ctx, pal, biomeDef, phase, time, camX) {
     const grad = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
     grad.addColorStop(0, pal.skyTop);
     grad.addColorStop(0.55, pal.skyMid);
@@ -142,12 +144,30 @@ export class Renderer {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Stars (brighter in lunar, faint high-altitude stars in solar)
-    const starAlpha = phase === PHASE.LUNAR ? 0.92 : 0.25;
+    // Stars (brighter in lunar / spire / sanctum)
+    const starAlpha = phase === PHASE.LUNAR || biomeDef.bgStyle === 'aurora' || biomeDef.bgStyle === 'cathedral' ? 0.9 : 0.25;
     for (const s of this.stars) {
       const tw = 0.4 + 0.6 * Math.sin(time * s.speed + s.phase);
       ctx.fillStyle = `rgba(235, 248, 255, ${(tw * starAlpha).toFixed(2)})`;
       ctx.fillRect(Math.floor(s.x), Math.floor(s.y), s.size, s.size);
+    }
+
+    // Aurora Borealis ribbons for Stage 5 (Spire)
+    if (biomeDef.bgStyle === 'aurora') {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let band = 0; band < 3; band++) {
+        ctx.strokeStyle = band === 0 ? 'rgba(72, 245, 210, 0.22)' : band === 1 ? 'rgba(92, 180, 255, 0.18)' : 'rgba(186, 120, 255, 0.16)';
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        for (let x = 0; x <= GAME_WIDTH; x += 16) {
+          const y = 42 + band * 18 + Math.sin(x * 0.018 + time * 1.4 + band * 2) * 14;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     // Sun / Crescent Moon
@@ -171,7 +191,7 @@ export class Renderer {
     }
 
     // Parallax Clouds
-    ctx.fillStyle = phase === PHASE.SOLAR ? 'rgba(255, 212, 168, 0.16)' : 'rgba(120, 210, 255, 0.11)';
+    ctx.fillStyle = phase === PHASE.SOLAR ? 'rgba(255, 212, 168, 0.14)' : 'rgba(120, 210, 255, 0.10)';
     for (let i = 0; i < 6; i++) {
       const cx = ((i * 110 - camX * 0.08 - time * 6) % (GAME_WIDTH + 120) + GAME_WIDTH + 120) % (GAME_WIDTH + 120) - 60;
       const cy = 34 + (i % 3) * 26;
@@ -179,21 +199,126 @@ export class Renderer {
       ctx.fillRect(Math.floor(cx) + 10, cy - 5, 24, 5);
     }
 
-    // Far Mountains
+    // Far & Mid Mountains
     this._drawMountainLayer(ctx, camX * 0.14, 168, 52, 72, pal.mountainFar);
-    // Mid Mountains + Ruin silhouettes
     this._drawMountainLayer(ctx, camX * 0.3, 196, 36, 54, pal.mountainMid);
 
-    // Distant Ruins Arches
-    ctx.fillStyle = pal.ruinsFar;
-    const archSpacing = 96;
-    const startArch = Math.floor((camX * 0.42) / archSpacing) - 1;
-    for (let i = startArch; i < startArch + 7; i++) {
-      const ax = Math.floor(i * archSpacing - camX * 0.42);
-      const h = 36 + ((Math.abs(i * 17) % 3) * 14);
-      ctx.fillRect(ax, GAME_HEIGHT - h - 22, 10, h + 22);
-      ctx.fillRect(ax + 24, GAME_HEIGHT - h - 22, 10, h + 22);
-      ctx.fillRect(ax - 2, GAME_HEIGHT - h - 26, 38, 6);
+    // Biome-Specific Midground Landmarks
+    this._drawBiomeLandmarks(ctx, biomeDef.bgStyle, pal, phase, time, camX);
+  }
+
+  _drawBiomeLandmarks(ctx, style, pal, phase, time, camX) {
+    const scroll = camX * 0.42;
+
+    if (style === 'arches') {
+      ctx.fillStyle = pal.propColor;
+      const spacing = 96;
+      const start = Math.floor(scroll / spacing) - 1;
+      for (let i = start; i < start + 7; i++) {
+        const ax = Math.floor(i * spacing - scroll);
+        const h = 36 + ((Math.abs(i * 17) % 3) * 14);
+        ctx.fillRect(ax, GAME_HEIGHT - h - 22, 10, h + 22);
+        ctx.fillRect(ax + 24, GAME_HEIGHT - h - 22, 10, h + 22);
+        ctx.fillRect(ax - 2, GAME_HEIGHT - h - 26, 38, 6);
+      }
+    } else if (style === 'crystals') {
+      const spacing = 84;
+      const start = Math.floor(scroll / spacing) - 1;
+      for (let i = start; i < start + 8; i++) {
+        const cx = Math.floor(i * spacing - scroll);
+        const h = 48 + ((Math.abs(i * 23) % 4) * 16);
+        const topY = GAME_HEIGHT - h - 18;
+        ctx.fillStyle = pal.propColor;
+        ctx.beginPath();
+        ctx.moveTo(cx, GAME_HEIGHT);
+        ctx.lineTo(cx + 11, topY);
+        ctx.lineTo(cx + 22, GAME_HEIGHT);
+        ctx.closePath();
+        ctx.fill();
+        // Glowing crystal ridge
+        ctx.fillStyle = phase === PHASE.LUNAR ? 'rgba(130, 224, 255, 0.35)' : 'rgba(255, 170, 210, 0.35)';
+        ctx.fillRect(cx + 10, topY + 4, 2, h - 8);
+      }
+    } else if (style === 'waterfalls') {
+      const spacing = 104;
+      const start = Math.floor(scroll / spacing) - 1;
+      for (let i = start; i < start + 7; i++) {
+        const wx = Math.floor(i * spacing - scroll);
+        // Aqueduct stone pillars
+        ctx.fillStyle = pal.propColor;
+        ctx.fillRect(wx, 92, 14, GAME_HEIGHT - 92);
+        ctx.fillRect(wx + 42, 92, 14, GAME_HEIGHT - 92);
+        ctx.fillRect(wx - 4, 86, 64, 10);
+        // Animated cascading waterfall between pillars
+        ctx.fillStyle = phase === PHASE.LUNAR ? 'rgba(72, 224, 245, 0.35)' : 'rgba(128, 245, 225, 0.38)';
+        ctx.fillRect(wx + 16, 96, 24, GAME_HEIGHT - 96);
+        ctx.fillStyle = 'rgba(230, 255, 255, 0.52)';
+        const fallOffset = Math.floor(time * 60) % 24;
+        for (let fy = 96 + fallOffset; fy < GAME_HEIGHT; fy += 24) {
+          ctx.fillRect(wx + 19, fy, 4, 10);
+          ctx.fillRect(wx + 31, (fy + 12) % GAME_HEIGHT, 4, 10);
+        }
+      }
+    } else if (style === 'gears') {
+      const spacing = 112;
+      const start = Math.floor(scroll / spacing) - 1;
+      for (let i = start; i < start + 7; i++) {
+        const gx = Math.floor(i * spacing - scroll) + 32;
+        const gy = 160 + ((i % 2) * 28);
+        const r = i % 2 === 0 ? 26 : 18;
+        const dir = i % 2 === 0 ? 1 : -1;
+        ctx.save();
+        ctx.translate(gx, gy);
+        ctx.rotate(time * 0.55 * dir);
+        ctx.fillStyle = pal.propColor;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fill();
+        for (let t = 0; t < 8; t++) {
+          ctx.rotate(Math.PI / 4);
+          ctx.fillRect(-3, -r - 5, 6, 7);
+        }
+        ctx.fillStyle = pal.mountainMid;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.42, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    } else if (style === 'aurora') {
+      // Floating celestial rings
+      const spacing = 128;
+      const start = Math.floor(scroll / spacing) - 1;
+      ctx.strokeStyle = phase === PHASE.LUNAR ? 'rgba(110, 245, 235, 0.28)' : 'rgba(220, 240, 255, 0.30)';
+      ctx.lineWidth = 2;
+      for (let i = start; i < start + 6; i++) {
+        const rx = Math.floor(i * spacing - scroll) + 40;
+        const ry = 124 + Math.sin(time * 1.4 + i) * 12;
+        ctx.beginPath();
+        ctx.arc(rx, ry, 20, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(rx, ry, 30, 8, Math.sin(time + i) * 0.25, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    } else if (style === 'cathedral') {
+      const spacing = 92;
+      const start = Math.floor(scroll / spacing) - 1;
+      for (let i = start; i < start + 7; i++) {
+        const sx = Math.floor(i * spacing - scroll);
+        ctx.fillStyle = pal.propColor;
+        ctx.fillRect(sx, 78, 36, GAME_HEIGHT - 78);
+        ctx.beginPath();
+        ctx.moveTo(sx, 78);
+        ctx.lineTo(sx + 18, 46);
+        ctx.lineTo(sx + 36, 78);
+        ctx.closePath();
+        ctx.fill();
+        // Glowing stained-glass lancet window
+        ctx.fillStyle = phase === PHASE.LUNAR ? 'rgba(92, 224, 255, 0.35)' : 'rgba(255, 210, 96, 0.38)';
+        ctx.fillRect(sx + 13, 92, 10, 44);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.fillRect(sx + 17, 92, 2, 44);
+      }
     }
   }
 
@@ -216,6 +341,7 @@ export class Renderer {
     const startTx = Math.max(0, Math.floor(camX / TILE_SIZE) - 1);
     const endTx = Math.min(level.width - 1, Math.ceil((camX + GAME_WIDTH) / TILE_SIZE) + 1);
     const t = this.atlas.tiles;
+    const bt = (this.atlas.biomes && this.atlas.biomes[level.biome]) || t;
     const isLunar = phase === PHASE.LUNAR;
     const qTile = Math.floor(time * 4) % 2 === 0 ? t.question : t.questionGlow;
 
@@ -230,10 +356,10 @@ export class Renderer {
 
         switch (tile) {
           case TILE.GROUND:
-            ctx.drawImage(isLunar ? t.groundLunar : t.groundSolar, px, py);
+            ctx.drawImage(isLunar ? bt.groundLunar : bt.groundSolar, px, py);
             break;
           case TILE.DIRT:
-            ctx.drawImage(isLunar ? t.dirtLunar : t.dirtSolar, px, py);
+            ctx.drawImage(isLunar ? bt.dirtLunar : bt.dirtSolar, px, py);
             break;
           case TILE.BRICK:
             ctx.drawImage(t.brick, px, py);
@@ -323,9 +449,8 @@ export class Renderer {
     ctx.fillRect(cx - 1, cy - 2, 2, 8);
   }
 
-  _drawInteractiveGrass(ctx, grass, phase) {
-    const color = phase === PHASE.LUNAR ? '#6ef7e8' : '#74e86b';
-    ctx.strokeStyle = color;
+  _drawInteractiveGrass(ctx, grass, color) {
+    ctx.strokeStyle = color || '#74e86b';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i < grass.length; i++) {
@@ -627,13 +752,54 @@ export class Renderer {
     ctx.restore();
   }
 
-  _drawAmbient(ctx, ambient, phase, time) {
-    const col = phase === PHASE.LUNAR ? '#80f4ff' : '#ffd573';
+  _drawAmbient(ctx, ambient, weather, phase, time, camX) {
+    if (weather === 'rain') {
+      ctx.strokeStyle = phase === PHASE.LUNAR ? 'rgba(130, 240, 255, 0.38)' : 'rgba(200, 255, 245, 0.36)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < 48; i++) {
+        const rx = camX + (((i * 37 - time * 140) % GAME_WIDTH) + GAME_WIDTH) % GAME_WIDTH;
+        const ry = ((i * 29 + time * 260) % GAME_HEIGHT);
+        ctx.moveTo(rx, ry);
+        ctx.lineTo(rx - 3, ry + 8);
+      }
+      ctx.stroke();
+      return;
+    }
+
+    if (weather === 'snow') {
+      ctx.fillStyle = '#e8fbff';
+      for (let i = 0; i < 42; i++) {
+        const sx = camX + (((i * 41 + Math.sin(time * 1.5 + i) * 18 - time * 16) % GAME_WIDTH) + GAME_WIDTH) % GAME_WIDTH;
+        const sy = (i * 23 + time * (26 + (i % 3) * 10)) % GAME_HEIGHT;
+        ctx.globalAlpha = 0.45 + (i % 3) * 0.18;
+        ctx.fillRect(Math.round(sx), Math.round(sy), i % 4 === 0 ? 2 : 1, i % 4 === 0 ? 2 : 1);
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    const col =
+      weather === 'embers'
+        ? phase === PHASE.LUNAR ? '#ff80d4' : '#ff7b2e'
+        : weather === 'prism'
+        ? phase === PHASE.LUNAR ? '#a8b8ff' : '#ff9ed2'
+        : weather === 'runes'
+        ? phase === PHASE.LUNAR ? '#6ef3ff' : '#ffe066'
+        : phase === PHASE.LUNAR ? '#80f4ff' : '#ffd573';
+
     for (const a of ambient) {
-      const alpha = 0.28 + 0.45 * Math.sin(time * 3 + a.phase);
+      const alpha = 0.32 + 0.5 * Math.sin(time * 3.5 + a.phase);
       ctx.fillStyle = col;
-      ctx.globalAlpha = Math.max(0.08, alpha);
-      ctx.fillRect(Math.round(a.x), Math.round(a.y), a.size, a.size);
+      ctx.globalAlpha = Math.max(0.1, alpha);
+      const ax = Math.round(a.x);
+      const ay = Math.round(a.y);
+      if (weather === 'prism' || weather === 'runes') {
+        ctx.fillRect(ax, ay - 1, 1, 3);
+        ctx.fillRect(ax - 1, ay, 3, 1);
+      } else {
+        ctx.fillRect(ax, ay, a.size, a.size);
+      }
     }
     ctx.globalAlpha = 1;
   }

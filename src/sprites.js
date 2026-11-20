@@ -1,3 +1,5 @@
+import { BIOME_THEMES } from './constants.js';
+
 // Procedural 16-bit style Pixel Art Sprite & Tile Atlas Generator
 
 function makeCanvas(w, h) {
@@ -38,16 +40,29 @@ function flipH(src) {
 export function createSpriteAtlas() {
   const atlas = {
     tiles: {},
+    biomes: {},
     player: { solar: {}, lunar: {} },
     enemies: {},
     items: {},
   };
 
-  // --- TILES (16x16) ---
-  atlas.tiles.groundSolar = bakeGroundTile('#44c767', '#268a4d', '#7ee872', '#7a4b38', '#522f26', '#9e674d');
-  atlas.tiles.groundLunar = bakeGroundTile('#39c9c4', '#1d7588', '#8cf7ee', '#3a355c', '#25213e', '#564f82');
-  atlas.tiles.dirtSolar = bakeDirtTile('#7a4b38', '#522f26', '#9e674d', '#3e211b');
-  atlas.tiles.dirtLunar = bakeDirtTile('#3a355c', '#25213e', '#564f82', '#1a162e');
+  // --- PER-BIOME GROUND & DIRT TILES (6 Biomes x Solar/Lunar) ---
+  for (const [bName, bDef] of Object.entries(BIOME_THEMES)) {
+    const s = bDef.solar;
+    const l = bDef.lunar;
+    atlas.biomes[bName] = {
+      groundSolar: bakeGroundTile(s.tileTop, s.tileTopDark, s.tileTopHi, s.tileDirt, s.tileDirtDark, s.tileDirtHi),
+      groundLunar: bakeGroundTile(l.tileTop, l.tileTopDark, l.tileTopHi, l.tileDirt, l.tileDirtDark, l.tileDirtHi),
+      dirtSolar: bakeDirtTile(s.tileDirt, s.tileDirtDark, s.tileDirtHi, '#1a1218'),
+      dirtLunar: bakeDirtTile(l.tileDirt, l.tileDirtDark, l.tileDirtHi, '#0e101c'),
+    };
+  }
+
+  // --- SHARED TILES (16x16) ---
+  atlas.tiles.groundSolar = atlas.biomes.ruins.groundSolar;
+  atlas.tiles.groundLunar = atlas.biomes.ruins.groundLunar;
+  atlas.tiles.dirtSolar = atlas.biomes.ruins.dirtSolar;
+  atlas.tiles.dirtLunar = atlas.biomes.ruins.dirtLunar;
   atlas.tiles.brick = bakeBrickTile();
   atlas.tiles.question = bakeQuestionTile(false);
   atlas.tiles.questionGlow = bakeQuestionTile(true);
